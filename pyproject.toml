@@ -1,0 +1,24 @@
+[project]
+name = "osc-data"
+version = "0.1.0"
+description = "Add your description here"
+authors = [
+    { name = "wangmengdi06", email = "wangmengdi06@58.com" }
+]
+dependencies = []
+readme = "README.md"
+requires-python = ">= 3.8"
+
+[build-system]
+requires = ["maturin>=1.2,<2.0"]
+build-backend = "maturin"
+
+[tool.rye]
+managed = true
+dev-dependencies = []
+
+
+[tool.maturin]
+python-source = "python"
+module-name = "osc_data._lowlevel"
+features = ["pyo3/extension-module"]
