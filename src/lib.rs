@@ -1,11 +1,13 @@
 mod audio;
 
-use audio::AudioDoc;
+use audio::Audio;
 use pyo3::prelude::*;
 
 /// A Python module implemented in Rust.
 #[pymodule]
-fn _lowlevel(_py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_class::<AudioDoc>()?;
+fn _lowlevel(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
+    let audio_module = PyModule::new_bound(py, "audio")?;
+    audio_module.add_class::<Audio>()?;
+    m.add_submodule(&audio_module)?;
     Ok(())
 }

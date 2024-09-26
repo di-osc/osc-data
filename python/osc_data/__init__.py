@@ -1,1 +1,1 @@
-from .audio import AudioDoc
+from .audio import Audio
