@@ -27,3 +27,7 @@ class Audio(audio.Audio):
 
     def __repr__(self):
         return f'<Audio path="{self.path}" desc="{self.desc}" sample_rate="{self.sample_rate}">'
+
+low_frame_rate = audio.low_frame_rate
+
+__all__ = ["Audio", "low_frame_rate"]

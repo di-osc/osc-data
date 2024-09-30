@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Optional
+import numpy as np
 
 @dataclass
 class Audio:
@@ -15,3 +16,6 @@ class Audio:
 
     def load_local(self) -> None:
         pass
+    
+def low_frame_rate(frames: np.ndarray, m: int, n: int) -> np.ndarray:
+    pass
