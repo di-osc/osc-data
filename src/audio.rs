@@ -107,18 +107,66 @@ pub fn low_frame_rate<'py>(
     for i in 0..repeat_times + 1 {
         output_frames
             .slice_mut(s![0, i * n_hidden..(i + 1) * n_hidden])
-            .assign(&frames);
+            .assign(&frames.slice(s![0, ..]));
     }
-    for i in 1..(m - repeat_times + 1) {
+    for i in 0..(m - repeat_times - 1) {
+        let start = (repeat_times + i + 1) * n_hidden;
+        let end = (repeat_times + i + 2) * n_hidden;
         output_frames
-            .slice_mut(s![0, i * n_hidden..(i + 1) * n_hidden])
-            .assign(&frames.slice(s![0..n_frames - i, ..]));
+            .slice_mut(s![0, start..end])
+            .assign(&frames.slice(s![1 + i, ..]));
     }
 
-    // 左填充为数组第一个元素 填充repeat_times次
-    output_frames
-        .slice_mut(s![.., 0..n_hidden])
-        .assign(&frames.slice(s![0, ..]));
-    // let left_padding = Array2::from_elem((repeat_times, frames.shape()[1]), frames.slice(s![0, ..]));
+    // 填充剩余帧
+    for i in 1..n_output_frames {
+        // 起点在0点左侧
+        if repeat_times > i * n {
+            if repeat_times > i * n + m {
+                // 此时全部用frames[0]填充
+                for j in 0..m {
+                    let inner_start = j * n_hidden;
+                    let inner_end = (j + 1) * n_hidden;
+                    output_frames
+                        .slice_mut(s![i, inner_start..inner_end])
+                        .assign(&frames.slice(s![0, ..]));
+                }
+            } else {
+                let n_left = repeat_times - i * n;
+                // m - repeat_times个frames[0]填充
+                for j in 0..n_left {
+                    let inner_start = j * n_hidden;
+                    let inner_end = (j + 1) * n_hidden;
+                    output_frames
+                        .slice_mut(s![i, inner_start..inner_end])
+                        .assign(&frames.slice(s![0, ..]));
+                }
+
+                for j in 0..m - n_left {
+                    let inner_start = (j + n_left) * n_hidden;
+                    let inner_end = (j + n_left + 1) * n_hidden;
+                    output_frames
+                        .slice_mut(s![i, inner_start..inner_end])
+                        .assign(&frames.slice(s![j, ..]));
+                }
+            }
+        }
+        // 起点在0点右侧
+        else {
+            let start = i * n - repeat_times;
+            for j in 0..m {
+                let inner_start = j * n_hidden;
+                let inner_end = (j + 1) * n_hidden;
+                if start + j >= n_frames {
+                    output_frames
+                        .slice_mut(s![i, inner_start..inner_end])
+                        .assign(&frames.slice(s![-1, ..]));
+                } else {
+                    output_frames
+                        .slice_mut(s![i, inner_start..inner_end])
+                        .assign(&frames.slice(s![start + j, ..]));
+                }
+            }
+        }
+    }
     Ok(output_frames.to_pyarray_bound(py))
 }
