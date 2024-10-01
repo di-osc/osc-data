@@ -11,11 +11,7 @@ class Audio:
     sample_rate: Optional[int] = None
     waveform: Optional[bytes] = None
 
-    def load_url(self) -> None:
-        pass
+    def load_url(self) -> None: ...
+    def load_local(self) -> None: ...
 
-    def load_local(self) -> None:
-        pass
-    
-def low_frame_rate(frames: np.ndarray, m: int, n: int) -> np.ndarray:
-    pass
+def low_frame_rate(frames: np.ndarray, m: int, n: int) -> np.ndarray: ...
