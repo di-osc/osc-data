@@ -1,6 +1,6 @@
 use ndarray::prelude::*;
 use ndarray::Array2;
-use numpy::{PyArray2, PyReadonlyArray2, ToPyArray};
+use numpy::{PyArray2, PyArray3, PyReadonlyArray2, PyReadonlyArray3, ToPyArray};
 use pyo3::prelude::*;
 use uuid::Uuid;
 
@@ -91,30 +91,31 @@ impl Audio {
 #[pyfunction]
 pub fn low_frame_rate<'py>(
     py: Python<'py>,
-    frames: PyReadonlyArray2<f32>,
+    frames: PyReadonlyArray3<f32>,
     m: usize,
     n: usize,
-) -> PyResult<Bound<'py, PyArray2<f32>>> {
+) -> PyResult<Bound<'py, PyArray3<f32>>> {
     let frames = frames.as_array();
-    let n_frames = frames.shape()[0];
-    let n_hidden = frames.shape()[1];
+    let batch_size = frames.shape()[0];
+    let n_frames = frames.shape()[1];
+    let n_hidden = frames.shape()[2];
     let n_output_frames = n_frames.div_ceil(n);
     let n_output_hidden = n_hidden * m;
-    let mut output_frames = Array2::<f32>::zeros((n_output_frames, n_output_hidden));
+    let mut output_frames = Array3::<f32>::zeros((batch_size, n_output_frames, n_output_hidden));
     // repeat time = (m - 1) // 2
     let repeat_times = (m - 1) / 2;
     // 第一帧填充: 数组第一个元素 * repeat_times + 1 -> frames[1: repeat_times + 1]
     for i in 0..repeat_times + 1 {
         output_frames
-            .slice_mut(s![0, i * n_hidden..(i + 1) * n_hidden])
-            .assign(&frames.slice(s![0, ..]));
+            .slice_mut(s![.., 0, i * n_hidden..(i + 1) * n_hidden])
+            .assign(&frames.slice(s![.., 0, ..]));
     }
     for i in 0..(m - repeat_times - 1) {
         let start = (repeat_times + i + 1) * n_hidden;
         let end = (repeat_times + i + 2) * n_hidden;
         output_frames
-            .slice_mut(s![0, start..end])
-            .assign(&frames.slice(s![1 + i, ..]));
+            .slice_mut(s![.., 0, start..end])
+            .assign(&frames.slice(s![.., 1 + i, ..]));
     }
 
     // 填充剩余帧
@@ -127,8 +128,8 @@ pub fn low_frame_rate<'py>(
                     let inner_start = j * n_hidden;
                     let inner_end = (j + 1) * n_hidden;
                     output_frames
-                        .slice_mut(s![i, inner_start..inner_end])
-                        .assign(&frames.slice(s![0, ..]));
+                        .slice_mut(s![.., i, inner_start..inner_end])
+                        .assign(&frames.slice(s![.., 0, ..]));
                 }
             } else {
                 let n_left = repeat_times - i * n;
@@ -137,16 +138,16 @@ pub fn low_frame_rate<'py>(
                     let inner_start = j * n_hidden;
                     let inner_end = (j + 1) * n_hidden;
                     output_frames
-                        .slice_mut(s![i, inner_start..inner_end])
-                        .assign(&frames.slice(s![0, ..]));
+                        .slice_mut(s![.., i, inner_start..inner_end])
+                        .assign(&frames.slice(s![.., 0, ..]));
                 }
 
                 for j in 0..m - n_left {
                     let inner_start = (j + n_left) * n_hidden;
                     let inner_end = (j + n_left + 1) * n_hidden;
                     output_frames
-                        .slice_mut(s![i, inner_start..inner_end])
-                        .assign(&frames.slice(s![j, ..]));
+                        .slice_mut(s![.., i, inner_start..inner_end])
+                        .assign(&frames.slice(s![.., j, ..]));
                 }
             }
         }
@@ -158,15 +159,15 @@ pub fn low_frame_rate<'py>(
                 let inner_end = (j + 1) * n_hidden;
                 if start + j >= n_frames {
                     output_frames
-                        .slice_mut(s![i, inner_start..inner_end])
-                        .assign(&frames.slice(s![-1, ..]));
+                        .slice_mut(s![.., i, inner_start..inner_end])
+                        .assign(&frames.slice(s![.., -1, ..]));
                 } else {
                     output_frames
-                        .slice_mut(s![i, inner_start..inner_end])
-                        .assign(&frames.slice(s![start + j, ..]));
+                        .slice_mut(s![.., i, inner_start..inner_end])
+                        .assign(&frames.slice(s![.., start + j, ..]));
                 }
             }
         }
     }
-    Ok(output_frames.to_pyarray_bound(py))
+    Ok(PyArray3::from_owned_array_bound(py, output_frames))
 }
