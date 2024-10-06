@@ -174,3 +174,4 @@ target/
 # venv
 .venv
 *.ipynb
+*.svg
