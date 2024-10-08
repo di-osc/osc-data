@@ -175,3 +175,4 @@ target/
 .venv
 *.ipynb
 *.svg
+*.lock
