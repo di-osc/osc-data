@@ -1,11 +1,10 @@
-use std::ops::Add;
 use ndarray::parallel::prelude::*;
 use ndarray::prelude::*;
-// use numpy::ndarray::prelude::*;
-// use numpy::ndarray::parallel::prelude::*;
-// use numpy::ndarray::Array2;
-use numpy::{PyArray2, PyArray3, PyReadonlyArray2, PyReadonlyArray3, PyUntypedArrayMethods, ToPyArray};
+use numpy::{
+    PyArray2, PyArray3, PyReadonlyArray2, PyReadonlyArray3, PyUntypedArrayMethods, ToPyArray,
+};
 use pyo3::prelude::*;
+use std::ops::Add;
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]
