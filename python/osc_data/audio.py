@@ -30,5 +30,6 @@ class Audio(audio.Audio):
 
 
 low_frame_rate = audio.low_frame_rate
+compute_decibel = audio.compute_decibel
 
 __all__ = ["Audio", "low_frame_rate"]

@@ -9,7 +9,7 @@ name = "osc_data"
 crate-type = ["cdylib"]
 
 [dependencies]
-ndarray = "0.15.6"
+ndarray = {version = "0.15.6", features = ["rayon", "blas"]}
 numpy = "0.21.0"
 pyo3 = { version = "0.21", features = ["extension-module", "macros"] }
 uuid = { version = "1.10.0", features = ["v4"] }

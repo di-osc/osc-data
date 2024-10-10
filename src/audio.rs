@@ -1,6 +1,10 @@
+use std::ops::Add;
+use ndarray::parallel::prelude::*;
 use ndarray::prelude::*;
-use ndarray::Array2;
-use numpy::{PyArray2, PyArray3, PyReadonlyArray2, PyReadonlyArray3, ToPyArray};
+// use numpy::ndarray::prelude::*;
+// use numpy::ndarray::parallel::prelude::*;
+// use numpy::ndarray::Array2;
+use numpy::{PyArray2, PyArray3, PyReadonlyArray2, PyReadonlyArray3, PyUntypedArrayMethods, ToPyArray};
 use pyo3::prelude::*;
 use uuid::Uuid;
 
@@ -170,4 +174,24 @@ pub fn low_frame_rate<'py>(
         }
     }
     Ok(PyArray3::from_owned_array_bound(py, output_frames))
+}
+
+#[pyfunction]
+pub fn compute_decibel<'py>(
+    python: Python<'py>,
+    frames: PyReadonlyArray2<f32>,
+) -> PyResult<Bound<'py, PyArray2<f32>>> {
+    let frame_len = frames.shape()[0];
+    let mut buffer = Vec::<f32>::with_capacity(frame_len);
+    frames
+        .as_array()
+        .axis_iter(Axis(0))
+        .into_par_iter()
+        .map(|row| row.mapv(|x| x.powi(2)).sum().add(1e-6).log10() * 10.)
+        .collect_into_vec(&mut buffer);
+    let decibels = Array::<f32, _>::from(buffer)
+        .into_shape((frame_len, 1))
+        .unwrap();
+
+    Ok(PyArray2::from_owned_array_bound(python, decibels))
 }
