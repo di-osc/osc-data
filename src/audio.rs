@@ -23,6 +23,7 @@ pub struct Audio {
 
 #[pymethods]
 impl Audio {
+    #[pyo3(signature = (path, desc=None))]
     #[new]
     fn new(path: String, desc: Option<String>) -> Self {
         let id = Uuid::new_v4().to_string();
@@ -178,7 +179,7 @@ pub fn low_frame_rate<'py>(
 #[pyfunction]
 pub fn compute_decibel<'py>(
     python: Python<'py>,
-    frames: PyReadonlyArray2<f32>,
+    frames: PyReadonlyArray2<'py, f32>,
 ) -> PyResult<Bound<'py, PyArray2<f32>>> {
     let frame_len = frames.shape()[0];
     let mut buffer = Vec::<f32>::with_capacity(frame_len);
@@ -186,10 +187,10 @@ pub fn compute_decibel<'py>(
         .as_array()
         .axis_iter(Axis(0))
         .into_par_iter()
-        .map(|row| row.mapv(|x| x.powi(2)).sum().add(1e-6).log10() * 10.)
+        .map(|row| row.pow2().sum().add(1e-6).log10() * 10.)
         .collect_into_vec(&mut buffer);
     let decibels = Array::<f32, _>::from(buffer)
-        .into_shape((frame_len, 1))
+        .into_shape_with_order((frame_len, 1))
         .unwrap();
 
     Ok(PyArray2::from_owned_array_bound(python, decibels))
