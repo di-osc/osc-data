@@ -12,6 +12,4 @@ crate-type = ["cdylib"]
 ndarray = {version = "0.16", features = ["rayon", "blas"]}
 numpy = {version = "0.22.0"}
 pyo3 = { version = "0.22", features = ["extension-module", "macros"] }
-blas-src = { version = "0.8", features = ["openblas"] }
-openblas-src = { version = "0.10", features = ["cblas", "system"] }
 uuid = { version = "1.10.0", features = ["v4"] }
