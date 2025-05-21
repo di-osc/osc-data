@@ -1,6 +1,6 @@
 [project]
 name = "osc-data"
-version = "0.1.2"
+version = "0.1.6"
 description = "data represent, processing"
 readme = "README.md"
 authors = [
