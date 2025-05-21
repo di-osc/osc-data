@@ -1,22 +1,26 @@
-use ndarray::parallel::prelude::*;
-use ndarray::prelude::*;
 use numpy::{
-    PyArray2, PyArray3, PyReadonlyArray2, PyReadonlyArray3, PyUntypedArrayMethods, ToPyArray,
+    PyArray2, PyArray3, PyReadonlyArray2, PyReadonlyArray3, PyUntypedArrayMethods, ToPyArray
 };
+use numpy::ndarray::{Array2, Array3, Axis, s, Array};
+use numpy::ndarray::parallel::prelude::*;
 use pyo3::prelude::*;
 use std::ops::Add;
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]
-#[pyclass(subclass)]
+#[pyclass]
 pub struct Audio {
     #[pyo3(get)]
     id: String,
     #[pyo3(get, set)]
     path: String,
+    #[pyo3(get, set)]
     desc: Option<String>,
+    #[pyo3(get, set)]
     duration: Option<f32>,
+    #[pyo3(get, set)]
     mono: Option<bool>,
+    #[pyo3(get, set)]
     sample_rate: Option<u16>,
     waveform: Option<Array2<f32>>,
 }
@@ -39,49 +43,9 @@ impl Audio {
     }
 
     #[getter]
-    fn duration(&self) -> Option<f32> {
-        self.duration
-    }
-
-    #[setter]
-    fn set_duration(&mut self, duration: Option<f32>) {
-        self.duration = duration;
-    }
-
-    #[getter]
-    fn mono(&self) -> Option<bool> {
-        self.mono
-    }
-
-    #[setter]
-    fn set_mono(&mut self, mono: Option<bool>) {
-        self.mono = mono;
-    }
-
-    #[getter]
-    fn sample_rate(&self) -> Option<u16> {
-        self.sample_rate
-    }
-
-    #[setter]
-    fn set_sample_rate(&mut self, sample_rate: Option<u16>) {
-        self.sample_rate = sample_rate;
-    }
-
-    #[getter]
-    fn desc(&self) -> Option<&str> {
-        self.desc.as_deref()
-    }
-
-    #[setter]
-    fn set_desc(&mut self, desc: Option<String>) {
-        self.desc = desc;
-    }
-
-    #[getter]
     fn waveform<'py>(&mut self, py: Python<'py>) -> Option<Bound<'py, PyArray2<f32>>> {
         match &mut self.waveform {
-            Some(waveform) => Some(waveform.to_pyarray_bound(py)),
+            Some(waveform) => Some(waveform.to_pyarray(py)),
             None => None,
         }
     }
@@ -173,7 +137,7 @@ pub fn low_frame_rate<'py>(
             }
         }
     }
-    Ok(PyArray3::from_owned_array_bound(py, output_frames))
+    Ok(PyArray3::from_owned_array(py, output_frames))
 }
 
 #[pyfunction]
@@ -193,5 +157,13 @@ pub fn compute_decibel<'py>(
         .into_shape_with_order((frame_len, 1))
         .unwrap();
 
-    Ok(PyArray2::from_owned_array_bound(python, decibels))
+    Ok(PyArray2::from_owned_array(python, decibels))
+}
+
+#[pymodule(name = "audio")]
+pub fn audio_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<Audio>()?;
+    m.add_function(wrap_pyfunction!(compute_decibel, m)?)?;
+    m.add_function(wrap_pyfunction!(low_frame_rate, m)?)?;
+    Ok(())
 }

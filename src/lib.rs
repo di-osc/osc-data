@@ -1,15 +1,14 @@
 mod audio;
-
-use audio::{compute_decibel, low_frame_rate, Audio};
-use pyo3::prelude::*;
+use pyo3::{prelude::*, wrap_pymodule};
+use pyo3::types::PyDict;
 
 /// A Python module implemented in Rust.
-#[pymodule]
-fn _lowlevel(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
-    let audio_module = PyModule::new_bound(py, "audio")?;
-    audio_module.add_class::<Audio>()?;
-    audio_module.add_function(wrap_pyfunction!(low_frame_rate, &audio_module)?)?;
-    audio_module.add_function(wrap_pyfunction!(compute_decibel, &audio_module)?)?;
-    m.add_submodule(&audio_module)?;
+#[pymodule(name = "_core")]
+fn rust_ext<'py>(python: Python<'py>, m: &Bound<'py, PyModule>) -> PyResult<()> {
+    m.add_wrapped(wrap_pymodule!(audio::audio_module))?;
+
+    let sys = PyModule::import(python, "sys")?;
+    let sys_modules: Bound<'_, PyDict> = sys.getattr("modules")?.downcast_into()?;
+    sys_modules.set_item("osc_data.audio", m.getattr("audio")?)?;
     Ok(())
 }

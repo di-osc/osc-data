@@ -1,31 +1,21 @@
 [project]
 name = "osc-data"
 version = "0.1.0"
-description = "A Python package for processing multi-modal data."
+description = "data represent, processing"
+readme = "README.md"
 authors = [
     { name = "wangmengdi", email = "790990241@qq.com" }
 ]
-dependencies = [
-    "librosa >=0.10.2.post1",
-]
-readme = "README.md"
-requires-python = ">= 3.8"
+requires-python = ">=3.10"
+dependencies = []
 
-[build-system]
-requires = ["maturin>=1.2,<2.0"]
-build-backend = "maturin"
-
-[tool.rye]
-managed = true
-dev-dependencies = []
-
-[tool.rye.scripts]
-fmt = {chain = ["fmt:rust", "fmt:python"]}
-"fmt:rust" = "cargo fmt"
-"fmt:python" = "ruff format"
-
+[project.scripts]
+osc-data = "osc_data:main"
 
 [tool.maturin]
-python-source = "python"
-module-name = "osc_data._lowlevel"
-features = ["pyo3/extension-module"]
+module-name = "osc_data._core"
+python-packages = ["osc_data"]
+
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
