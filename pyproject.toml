@@ -7,10 +7,9 @@ authors = [
     { name = "wangmengdi", email = "790990241@qq.com" }
 ]
 requires-python = ">=3.10"
-dependencies = []
-
-[project.scripts]
-osc-data = "osc_data:main"
+dependencies = [
+    "numpy>=2.2.6",
+]
 
 [tool.maturin]
 module-name = "osc_data._core"
@@ -19,3 +18,9 @@ python-packages = ["osc_data"]
 [build-system]
 requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
+
+[dependency-groups]
+dev = [
+    "ipykernel>=6.29.5",
+    "maturin>=1.8.6",
+]
