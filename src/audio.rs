@@ -1,9 +1,6 @@
 use numpy::ndarray::parallel::prelude::*;
 use numpy::ndarray::{s, Array, Array3, Axis};
-use numpy::{
-    IntoPyArray, PyArray2, PyArray3, PyArrayDyn, PyReadonlyArray2, PyReadonlyArray3,
-    PyReadonlyArrayDyn, PyUntypedArrayMethods, ToPyArray,
-};
+use numpy::{PyArray2, PyArray3, PyReadonlyArray2, PyReadonlyArray3, PyUntypedArrayMethods};
 use pyo3::prelude::*;
 use std::ops::Add;
 
@@ -94,11 +91,10 @@ pub fn low_frame_rate<'py>(
 #[pyfunction]
 pub fn compute_decibel<'py>(
     python: Python<'py>,
-    frames: PyReadonlyArray2<'py, f32>,
+    frames: PyReadonlyArray2<f32>,
 ) -> PyResult<Bound<'py, PyArray2<f32>>> {
     let frame_len = frames.shape()[0];
     let mut buffer = Vec::<f32>::with_capacity(frame_len);
-    let start = std::time::Instant::now();
     frames
         .as_array()
         .axis_iter(Axis(0))
@@ -108,7 +104,6 @@ pub fn compute_decibel<'py>(
     let decibels = Array::<f32, _>::from(buffer)
         .into_shape_with_order((frame_len, 1))
         .unwrap();
-    let elapsed = start.elapsed();
     Ok(PyArray2::from_owned_array(python, decibels))
 }
 
