@@ -67,7 +67,6 @@ if __name__ == "__main__":
     import numpy as np
 
     arr = np.random.randn(2, 1000, 10000)
-    arr = arr.astype(np.float32)
     lfr_m = 5
     lfr_n = 1
     r1 = []

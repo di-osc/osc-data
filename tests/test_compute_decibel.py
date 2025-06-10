@@ -33,7 +33,6 @@ def compute_decibel(x: np.ndarray):
 
 if __name__ == "__main__":
     arr = np.random.rand(10000, 10000)
-    arr = arr.astype(np.float32)
     r1, torch_spent = torch_compute_decibel(arr)
     r2, np_spent = numpy_compute_decibel(arr)
     r3, rs_spent = compute_decibel(arr)
