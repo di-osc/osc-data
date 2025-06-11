@@ -7,17 +7,17 @@ use std::ops::Add;
 #[pyfunction]
 pub fn low_frame_rate<'py>(
     py: Python<'py>,
-    frames: PyReadonlyArray3<f32>,
+    frames: PyReadonlyArray3<f64>,
     m: usize,
     n: usize,
-) -> PyResult<Bound<'py, PyArray3<f32>>> {
+) -> PyResult<Bound<'py, PyArray3<f64>>> {
     let frames = frames.as_array();
     let batch_size = frames.shape()[0];
     let n_frames = frames.shape()[1];
     let n_hidden = frames.shape()[2];
     let n_output_frames = n_frames.div_ceil(n);
     let n_output_hidden = n_hidden * m;
-    let mut output_frames = Array3::<f32>::zeros((batch_size, n_output_frames, n_output_hidden));
+    let mut output_frames = Array3::<f64>::zeros((batch_size, n_output_frames, n_output_hidden));
     // repeat time = (m - 1) // 2
     let repeat_times = (m - 1) / 2;
     // 第一帧填充: 数组第一个元素 * repeat_times + 1 -> frames[1: repeat_times + 1]
@@ -91,17 +91,17 @@ pub fn low_frame_rate<'py>(
 #[pyfunction]
 pub fn compute_decibel<'py>(
     python: Python<'py>,
-    frames: PyReadonlyArray2<f32>,
-) -> PyResult<Bound<'py, PyArray2<f32>>> {
+    frames: PyReadonlyArray2<f64>,
+) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let frame_len = frames.shape()[0];
-    let mut buffer = Vec::<f32>::with_capacity(frame_len);
+    let mut buffer = Vec::<f64>::with_capacity(frame_len);
     frames
         .as_array()
         .axis_iter(Axis(0))
         .into_par_iter()
         .map(|row| row.pow2().sum().add(1e-6).log10() * 10.)
         .collect_into_vec(&mut buffer);
-    let decibels = Array::<f32, _>::from(buffer)
+    let decibels = Array::<f64, _>::from(buffer)
         .into_shape_with_order((frame_len, 1))
         .unwrap();
     Ok(PyArray2::from_owned_array(python, decibels))
