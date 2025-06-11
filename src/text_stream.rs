@@ -80,9 +80,12 @@ impl TextStreamSentencizer {
     pub fn flush(&mut self) -> Vec<String> {
         let (sentences, indices) = self.split_sentences();
         if sentences.is_empty() {
-            let result = self.buffer.clone();
+            let mut result = vec![];
+            if self.buffer.chars().count() > 0 {
+                result.push(self.buffer.clone());
+            }
             self.buffer.clear();
-            return vec![result];
+            return result;
         }
 
         if *indices.last().unwrap() == self.buffer.len() - 1 {
@@ -94,7 +97,9 @@ impl TextStreamSentencizer {
             self.buffer.clear();
 
             let mut result = sentences;
-            result.push(remaining);
+            if remaining.chars().count() > 0 {
+                result.push(remaining);
+            }
             result
         }
     }
@@ -107,7 +112,8 @@ impl TextStreamSentencizer {
 
         for end in end_indices {
             let sent = &self.buffer[start..=end];
-            if !sent.is_empty() && sent.len() >= self.min_sentence_length {
+            let sent_length = sent.chars().count();
+            if !sent.is_empty() && sent_length >= self.min_sentence_length {
                 sentences.push(sent.to_string());
                 sent_indices.push(end);
                 start = end + 1;
@@ -129,7 +135,8 @@ impl TextStreamSentencizer {
                 }
             })
             .collect();
-        if sents_l1.is_empty() && self.buffer.len() > self.use_level2_threshold {
+        let buffer_char_length = self.buffer.chars().count();
+        if sents_l1.is_empty() && buffer_char_length > self.use_level2_threshold {
             let sents_l2: Vec<usize> = self
                 .buffer
                 .char_indices()
@@ -142,7 +149,7 @@ impl TextStreamSentencizer {
                 })
                 .collect();
 
-            if sents_l2.is_empty() && self.buffer.len() > self.use_level3_threshold {
+            if sents_l2.is_empty() && buffer_char_length > self.use_level3_threshold {
                 self.buffer
                     .char_indices()
                     .filter_map(|(i, c)| {
