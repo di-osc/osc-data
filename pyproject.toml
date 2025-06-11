@@ -1,12 +1,12 @@
 [project]
 name = "osc-data"
-version = "0.1.7"
+version = "0.1.7.post0"
 description = "data represent, processing"
 readme = "README.md"
 authors = [
     { name = "wangmengdi", email = "790990241@qq.com" }
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 
 [tool.maturin]
 module-name = "osc_data._core"
@@ -20,7 +20,7 @@ build-backend = "maturin"
 dev = [
     "ipykernel>=6.29.5",
     "maturin>=1.8.6",
-    "numpy>=2.2.6",
+    "numpy>=2.0.2",
     "pip>=25.1.1",
     "torch>=2.7.1",
 ]
