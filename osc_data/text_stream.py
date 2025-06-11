@@ -23,6 +23,9 @@ class TextStreamSentencizer:
             l3_ends (List[str], optional): l3优先级切分字符,规则同l2. Defaults to [":", "："].
         """
         super().__init__()
+        assert check_all_chars(l1_ends), "l1_ends must be a list of chars"
+        assert check_all_chars(l2_ends), "l2_ends must be a list of chars"
+        assert check_all_chars(l3_ends), "l3_ends must be a list of chars"
         self._sentencizer = core_text_stream.TextStreamSentencizer(
             min_sentence_length=min_sentence_length,
             use_level2_threshold=use_level2_threshold,
@@ -37,3 +40,10 @@ class TextStreamSentencizer:
 
     def flush(self) -> List[str]:
         return self._sentencizer.flush()
+
+
+def check_all_chars(text: List[str]) -> bool:
+    for char in text:
+        if len(char) != 1 or not isinstance(char, str):
+            return False
+    return True
