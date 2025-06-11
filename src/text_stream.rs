@@ -1,136 +1,120 @@
 use pyo3::prelude::*;
 use std::collections::HashSet;
 
+const LEVEL1_ENDINGS: [char; 7] = ['!', '?', '。', '？', '！', '；', ';'];
+const LEVEL2_ENDINGS: [char; 3] = ['、', ',', '，'];
+const LEVEL3_ENDINGS: [char; 2] = [':', '：'];
+
+/// A simple Chinese sentence splitter for text streams.
+///
+/// This struct is used to split Chinese text into sentences.
+/// It keeps a buffer of text and splits it into sentences when it encounters a sentence ending character.
 #[derive(Debug, Default)]
-pub struct ChineseSentenceSplitter {
+#[pyclass]
+pub struct TextStreamSentencizer {
     buffer: String,
+    #[pyo3(get, set)]
     min_sentence_length: usize,
+    #[pyo3(get, set)]
     use_level2_threshold: usize,
+    #[pyo3(get, set)]
     use_level3_threshold: usize,
+    #[pyo3(get, set)]
     level1_endings: HashSet<char>,
-    level2_endings: HashSet<String>,
-    level3_endings: HashSet<String>,
+    #[pyo3(get, set)]
+    level2_endings: HashSet<char>,
+    #[pyo3(get, set)]
+    level3_endings: HashSet<char>,
 }
 
-impl ChineseSentenceSplitter {
-    pub fn new(min_sentence_length: usize) -> Self {
-        let mut level1_endings = HashSet::new();
-        for c in ['!', '?', '。', '？', '！', '；', ';'] {
-            level1_endings.insert(c);
-        }
-
-        let mut level2_endings = HashSet::new();
-        for s in ["、", "...", "…", ",", "，"] {
-            level2_endings.insert(s.to_string());
-        }
-
-        let mut level3_endings = HashSet::new();
-        for s in [":", "："] {
-            level3_endings.insert(s.to_string());
-        }
-
-        ChineseSentenceSplitter {
+#[pymethods]
+impl TextStreamSentencizer {
+    #[new]
+    #[pyo3(signature = (l1_ends=None, l2_ends=None, l3_ends=None, min_sentence_length=10, use_level2_threshold=50, use_level3_threshold=100))]
+    pub fn new(
+        l1_ends: Option<Vec<char>>,
+        l2_ends: Option<Vec<char>>,
+        l3_ends: Option<Vec<char>>,
+        min_sentence_length: usize,
+        use_level2_threshold: usize,
+        use_level3_threshold: usize,
+    ) -> Self {
+        let level1_endings = l1_ends
+            .unwrap_or(LEVEL1_ENDINGS.to_vec())
+            .into_iter()
+            .collect();
+        let level2_endings = l2_ends
+            .unwrap_or(LEVEL2_ENDINGS.to_vec())
+            .into_iter()
+            .collect();
+        let level3_endings = l3_ends
+            .unwrap_or(LEVEL3_ENDINGS.to_vec())
+            .into_iter()
+            .collect();
+        Self {
             buffer: String::new(),
-            min_sentence_length: min_sentence_length,
-            use_level2_threshold: 30,
-            use_level3_threshold: 100,
+            min_sentence_length,
+            use_level2_threshold,
+            use_level3_threshold,
             level1_endings,
             level2_endings,
             level3_endings,
         }
     }
 
-    pub fn with_min_sentence_length(mut self, length: usize) -> Self {
-        self.min_sentence_length = length;
-        self
-    }
-
-    pub fn with_level2_threshold(mut self, threshold: usize) -> Self {
-        self.use_level2_threshold = threshold;
-        self
-    }
-
-    pub fn with_level3_threshold(mut self, threshold: usize) -> Self {
-        self.use_level3_threshold = threshold;
-        self
-    }
-
-    pub fn process_text(
-        &mut self,
-        text: &str,
-        is_last: bool,
-        special_text: Option<&str>,
-    ) -> Vec<String> {
-        self.buffer.push_str(text);
-
-        if let Some(special) = special_text {
-            if self.buffer.ends_with(special) {
-                return vec![self.buffer.clone()];
-            }
+    pub fn push(&mut self, text: &str) -> Vec<String> {
+        if text.is_empty() {
+            return Vec::new();
         }
+        self.buffer.push_str(text);
 
         let (sentences, indices) = self.split_sentences();
 
-        if !is_last {
-            if !indices.is_empty() {
-                let remaining_start = indices.last().unwrap() + 1;
-                self.buffer = self.buffer[remaining_start..].to_string();
-            }
+        if !indices.is_empty() {
+            let remaining_start = indices.last().unwrap() + 1;
+            self.buffer = self.buffer[remaining_start..].to_string();
+        }
+        sentences
+    }
+
+    pub fn flush(&mut self) -> Vec<String> {
+        let (sentences, indices) = self.split_sentences();
+        if sentences.is_empty() {
+            let result = self.buffer.clone();
+            self.buffer.clear();
+            return vec![result];
+        }
+
+        if *indices.last().unwrap() == self.buffer.len() - 1 {
+            self.buffer.clear();
             sentences
         } else {
-            if sentences.is_empty() {
-                let result = self.buffer.clone();
-                self.buffer.clear();
-                return vec![result];
-            }
+            let remaining_start = indices.last().unwrap() + 1;
+            let remaining = self.buffer[remaining_start..].to_string();
+            self.buffer.clear();
 
-            if *indices.last().unwrap() == self.buffer.len() - 1 {
-                self.buffer.clear();
-                sentences
-            } else {
-                let remaining_start = indices.last().unwrap() + 1;
-                let remaining = self.buffer[remaining_start..].to_string();
-                self.buffer.clear();
-
-                let mut result = sentences;
-                result.push(remaining);
-                result
-            }
+            let mut result = sentences;
+            result.push(remaining);
+            result
         }
     }
 
     fn split_sentences(&self) -> (Vec<String>, Vec<usize>) {
-        let indices = self.get_sentence_end_indices();
+        let end_indices = self.get_sentence_end_indices();
         let mut sentences = Vec::new();
         let mut sent_indices = Vec::new();
         let mut start = 0;
 
-        for i in indices {
-            let sent = &self.buffer[start..=i];
+        for end in end_indices {
+            let sent = &self.buffer[start..=end];
             if !sent.is_empty() && sent.len() >= self.min_sentence_length {
                 sentences.push(sent.to_string());
-                sent_indices.push(i);
-                start = i + 1;
+                sent_indices.push(end);
+                start = end + 1;
             }
         }
 
         (sentences, sent_indices)
-    }
-
-    fn is_sentence_end_level1(&self, c: char) -> bool {
-        self.level1_endings.contains(&c)
-    }
-
-    fn is_sentence_end_level2(&self, text: &str) -> bool {
-        self.level2_endings
-            .iter()
-            .any(|ending| text.ends_with(ending))
-    }
-
-    fn is_sentence_end_level3(&self, text: &str) -> bool {
-        self.level3_endings
-            .iter()
-            .any(|ending| text.ends_with(ending))
     }
 
     fn get_sentence_end_indices(&self) -> Vec<usize> {
@@ -138,22 +122,20 @@ impl ChineseSentenceSplitter {
             .buffer
             .char_indices()
             .filter_map(|(i, c)| {
-                if self.is_sentence_end_level1(c) {
-                    Some(i)
+                if self.level1_endings.contains(&c) {
+                    Some(i + c.len_utf8() - 1)
                 } else {
                     None
                 }
             })
             .collect();
-
         if sents_l1.is_empty() && self.buffer.len() > self.use_level2_threshold {
             let sents_l2: Vec<usize> = self
                 .buffer
                 .char_indices()
-                .filter_map(|(i, _)| {
-                    let substr = &self.buffer[..=i];
-                    if self.is_sentence_end_level2(substr) {
-                        Some(i)
+                .filter_map(|(i, c)| {
+                    if self.level2_endings.contains(&c) {
+                        Some(i + c.len_utf8() - 1)
                     } else {
                         None
                     }
@@ -163,10 +145,9 @@ impl ChineseSentenceSplitter {
             if sents_l2.is_empty() && self.buffer.len() > self.use_level3_threshold {
                 self.buffer
                     .char_indices()
-                    .filter_map(|(i, _)| {
-                        let substr = &self.buffer[..=i];
-                        if self.is_sentence_end_level3(substr) {
-                            Some(i)
+                    .filter_map(|(i, c)| {
+                        if self.level3_endings.contains(&c) {
+                            Some(i + c.len_utf8() - 1)
                         } else {
                             None
                         }
@@ -187,6 +168,7 @@ impl ChineseSentenceSplitter {
 
 pub fn register_module(core_module: &Bound<'_, PyModule>) -> PyResult<()> {
     let audio_module = PyModule::new(core_module.py(), "text_stream")?;
+    audio_module.add_class::<TextStreamSentencizer>()?;
     core_module.add_submodule(&audio_module)?;
     Ok(())
 }
