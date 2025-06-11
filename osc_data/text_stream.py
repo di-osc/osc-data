@@ -41,6 +41,57 @@ class TextStreamSentencizer:
     def flush(self) -> List[str]:
         return self._sentencizer.flush()
 
+    @property
+    def min_sentence_length(self) -> int:
+        return self._sentencizer.min_sentence_length
+
+    @min_sentence_length.setter
+    def min_sentence_length(self, value: int):
+        self._sentencizer.min_sentence_length = value
+
+    @property
+    def use_level2_threshold(self) -> int:
+        return self._sentencizer.use_level2_threshold
+
+    @use_level2_threshold.setter
+    def use_level2_threshold(self, value: int):
+        self._sentencizer.use_level2_threshold = value
+
+    @property
+    def use_level3_threshold(self) -> int:
+        return self._sentencizer.use_level3_threshold
+
+    @use_level3_threshold.setter
+    def use_level3_threshold(self, value: int):
+        self._sentencizer.use_level3_threshold = value
+
+    @property
+    def l1_ends(self) -> List[str]:
+        return self._sentencizer.level1_endings
+
+    @l1_ends.setter
+    def l1_ends(self, value: List[str]):
+        assert check_all_chars(value), "l1_ends must be a list of chars"
+        self._sentencizer.level1_endings = value
+
+    @property
+    def l2_ends(self) -> List[str]:
+        return self._sentencizer.level2_endings
+
+    @l2_ends.setter
+    def l2_ends(self, value: List[str]):
+        assert check_all_chars(value), "l2_ends must be a list of chars"
+        self._sentencizer.level2_endings = value
+
+    @property
+    def l3_ends(self) -> List[str]:
+        return self._sentencizer.level3_endings
+
+    @l3_ends.setter
+    def l3_ends(self, value: List[str]):
+        assert check_all_chars(value), "l3_ends must be a list of chars"
+        self._sentencizer.level3_endings = value
+
 
 def check_all_chars(text: List[str]) -> bool:
     for char in text:
