@@ -1,4 +1,5 @@
 from typing import List
+
 from ._core import text_stream as core_text_stream
 
 
