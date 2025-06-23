@@ -53,15 +53,8 @@ class Token:
 
 
 class TokenParser:
-    def __init__(self, ordertype="tn"):
-        if ordertype == "tn":
-            self.orders = TN_ORDERS
-        elif ordertype == "itn":
-            self.orders = ITN_ORDERS
-        elif ordertype == "en_tn":
-            self.orders = EN_TN_ORDERS
-        else:
-            raise NotImplementedError()
+    def __init__(self):
+        self.orders = TN_ORDERS
 
     def load(self, input):
         assert len(input) > 0
@@ -147,59 +140,41 @@ class TokenParser:
         return output.strip()
 
 
-class Normalizer:
-    def __init__(
-        self,
-        lang="zh",
-        operator="tn",
-        remove_erhua=False,
-        enable_0_to_9=False,
-    ):
-        repo_dir = Path(__file__).parent / "assets" / "text"
-        assert lang in ["zh", "en"] and operator in ["tn", "itn"]
-        tagger_path = repo_dir / lang / operator / "tagger.fst"
-        if lang == "zh" and operator == "itn" and enable_0_to_9:
-            tagger_path = repo_dir / "zh" / "itn" / "tagger_enable_0_to_9.fst"
-
-        verbalizer_path = repo_dir / lang / operator / "verbalizer.fst"
-        if lang == "zh" and operator == "tn" and remove_erhua:
-            verbalizer_path = repo_dir / "zh" / "tn" / "verbalizer_remove_erhua.fst"
-
-        self.operator = operator
-        self.tagger = KaldiTextNormalizer(str(tagger_path))
-        self.verbalizer = KaldiTextNormalizer(str(verbalizer_path))
-
-    def tag(self, text):
-        return self.tagger(text)
-
-    def verbalize(self, text):
-        text = TokenParser(self.operator).reorder(text)
-        return self.verbalizer(text)
-
-    def normalize(self, text):
-        return self.verbalize(self.tag(text))
+KALDI_TAGGER = KaldiTextNormalizer(
+    str(Path(__file__).parent / "assets" / "text" / "tn" / "tagger.fst")
+)
+REORDER = TokenParser()
+VERALIZER = KaldiTextNormalizer(
+    str(Path(__file__).parent / "assets" / "text" / "tn" / "verbalizer.fst")
+)
+VERALIZER_REMOVE_ERHUA = KaldiTextNormalizer(
+    str(
+        Path(__file__).parent / "assets" / "text" / "tn" / "verbalizer_remove_erhua.fst"
+    )
+)
 
 
 class TextNormalizer(BaseModel):
     model_config: ConfigDict = ConfigDict(arbitrary_types_allowed=True)
 
     remove_erhua: bool = False
-    enable_0_to_9: bool = False
-    model: Normalizer | None = None
-    num_threads: int = 2
+    tagger: KaldiTextNormalizer = None
+    reorder: TokenParser = None
+    verbalizer: KaldiTextNormalizer = None
 
     @model_validator(mode="after")
     def setup_model(self) -> "TextNormalizer":
-        if self.model is None:
-            self.model = Normalizer(
-                remove_erhua=self.remove_erhua,
-                enable_0_to_9=self.enable_0_to_9,
-            )
+        if self.remove_erhua:
+            self.tagger = KALDI_TAGGER
+            self.verbalizer = VERALIZER_REMOVE_ERHUA
+        else:
+            self.tagger = KALDI_TAGGER
+            self.verbalizer = VERALIZER
+        self.reorder = REORDER
         return self
 
-    def _normalize(self, text: str) -> str:
-        text = self.model.normalize(text)
+    def normalize(self, text: str) -> str:
+        text = self.tagger(text)
+        text = self.reorder.reorder(text)
+        text = self.verbalizer(text)
         return text
-
-    def process_text(self, text: str) -> str:
-        return self._normalize(text)
