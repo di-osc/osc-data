@@ -155,7 +155,7 @@ class Normalizer:
         remove_erhua=False,
         enable_0_to_9=False,
     ):
-        repo_dir = Path(__file__).parent / "assets" / "wetext"
+        repo_dir = Path(__file__).parent / "assets" / "text"
         assert lang in ["zh", "en"] and operator in ["tn", "itn"]
         tagger_path = repo_dir / lang / operator / "tagger.fst"
         if lang == "zh" and operator == "itn" and enable_0_to_9:
