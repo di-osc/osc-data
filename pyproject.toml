@@ -1,6 +1,6 @@
 [project]
 name = "osc-data"
-version = "0.2.2"
+version = "0.2.3"
 description = "data represent, processing"
 readme = "README.md"
 authors = [
@@ -23,7 +23,7 @@ build-backend = "maturin"
 [dependency-groups]
 dev = [
     "ipykernel>=6.29.5",
-    "maturin>=1.8.6",
+    "maturin>=1.8.7",
     "numpy>=2.0.2",
     "pip>=25.1.1",
 ]
