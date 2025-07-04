@@ -1,4 +1,5 @@
 use pyo3::prelude::*;
+use regex::Regex;
 use std::collections::HashSet;
 
 const LEVEL1_ENDINGS: [char; 7] = ['!', '?', '。', '？', '！', '；', ';'];
@@ -25,12 +26,14 @@ pub struct TextStreamSentencizer {
     level2_endings: HashSet<char>,
     #[pyo3(get, set)]
     level3_endings: HashSet<char>,
+    #[pyo3(get, set)]
+    remove_emoji: bool,
 }
 
 #[pymethods]
 impl TextStreamSentencizer {
     #[new]
-    #[pyo3(signature = (l1_ends=None, l2_ends=None, l3_ends=None, min_sentence_length=10, use_level2_threshold=50, use_level3_threshold=100))]
+    #[pyo3(signature = (l1_ends=None, l2_ends=None, l3_ends=None, min_sentence_length=10, use_level2_threshold=50, use_level3_threshold=100, remove_emoji=false))]
     pub fn new(
         l1_ends: Option<Vec<char>>,
         l2_ends: Option<Vec<char>>,
@@ -38,6 +41,7 @@ impl TextStreamSentencizer {
         min_sentence_length: usize,
         use_level2_threshold: usize,
         use_level3_threshold: usize,
+        remove_emoji: bool,
     ) -> Self {
         let level1_endings = l1_ends
             .unwrap_or(LEVEL1_ENDINGS.to_vec())
@@ -59,6 +63,7 @@ impl TextStreamSentencizer {
             level1_endings,
             level2_endings,
             level3_endings,
+            remove_emoji,
         }
     }
 
@@ -66,7 +71,12 @@ impl TextStreamSentencizer {
         if text.is_empty() {
             return Vec::new();
         }
-        self.buffer.push_str(text);
+        // 移除 emoji
+        if self.remove_emoji {
+            self.buffer.push_str(remove_emojis(text).as_str());
+        } else {
+            self.buffer.push_str(text);
+        }
 
         let (sentences, indices) = self.split_sentences();
 
@@ -171,6 +181,20 @@ impl TextStreamSentencizer {
     pub fn reset(&mut self) {
         self.buffer.clear();
     }
+}
+
+fn remove_emojis(input: &str) -> String {
+    // 匹配常见 emoji 的 Unicode 范围
+    let emoji_regex = Regex::new(
+        r"[\u{1F600}-\u{1F64F}\
+          \u{1F300}-\u{1F5FF}\
+          \u{1F680}-\u{1F6FF}\
+          \u{1F1E6}-\u{1F1FF}\
+          \u{2600}-\u{26FF}\
+          \u{2700}-\u{27BF}]",
+    )
+    .unwrap();
+    emoji_regex.replace_all(input, "").to_string()
 }
 
 pub fn register_module(core_module: &Bound<'_, PyModule>) -> PyResult<()> {
