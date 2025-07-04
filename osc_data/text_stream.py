@@ -12,6 +12,7 @@ class TextStreamSentencizer:
         l1_ends: List[str] = ["!", "?", "。", "？", "！", "；", ";"],
         l2_ends: List[str] = ["、", ",", "，"],
         l3_ends: List[str] = [":", "："],
+        remove_emoji: bool = False,
     ):
         """
         文本流分句器
@@ -34,6 +35,7 @@ class TextStreamSentencizer:
             l1_ends=l1_ends,
             l2_ends=l2_ends,
             l3_ends=l3_ends,
+            remove_emoji=remove_emoji,
         )
 
     def push(self, text: str) -> List[str]:
