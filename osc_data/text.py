@@ -4,6 +4,8 @@ import string
 from kaldifst import TextNormalizer as KaldiTextNormalizer
 from pydantic import BaseModel, model_validator, ConfigDict
 
+from ._core import text as core_text
+
 
 EOS = "<EOS>"
 TN_ORDERS = {
@@ -166,4 +168,16 @@ class TextNormalizer(BaseModel):
         text = self.tagger(text)
         text = self.reorder.reorder(text)
         text = self.verbalizer(text)
+        return text
+
+
+class TextCleaner(BaseModel):
+    remove_emoji: bool = False
+    to_half_width: bool = False
+
+    def clean(self, text: str) -> str:
+        if self.remove_emoji:
+            text = core_text.remove_emojis(text)
+        if self.to_half_width:
+            text = core_text.to_half_width(text)
         return text
