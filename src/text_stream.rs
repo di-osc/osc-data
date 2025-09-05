@@ -198,8 +198,8 @@ fn remove_emojis(input: &str) -> String {
 }
 
 pub fn register_module(core_module: &Bound<'_, PyModule>) -> PyResult<()> {
-    let audio_module = PyModule::new(core_module.py(), "text_stream")?;
-    audio_module.add_class::<TextStreamSentencizer>()?;
-    core_module.add_submodule(&audio_module)?;
+    let text_stream_module = PyModule::new(core_module.py(), "text_stream")?;
+    text_stream_module.add_class::<TextStreamSentencizer>()?;
+    core_module.add_submodule(&text_stream_module)?;
     Ok(())
 }
