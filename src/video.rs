@@ -3,8 +3,7 @@ use numpy::PyArray4;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use serde::Deserialize;
-use std::io::Read;
-use std::process::{Command, Stdio};
+use std::process::Command;
 use video_rs::decode::Decoder;
 use video_rs::Url;
 
@@ -123,59 +122,11 @@ fn ffprobe_meta(input: &str) -> Result<VideoMeta> {
     let duration = parse_f64_opt(&stream.duration)
         .or_else(|| parsed.format.and_then(|f| parse_f64_opt(&f.duration)))
         .unwrap_or(0.0);
-    Ok(VideoMeta {
-        width,
-        height,
-        fps,
-        duration,
-    })
+    Ok(VideoMeta { width, height, fps, duration })
 }
 
-fn ffmpeg_decode_rgb(input: &str, width: usize, height: usize) -> Result<Vec<u8>> {
-    let mut child = Command::new("ffmpeg")
-        .arg("-v")
-        .arg("error")
-        .arg("-nostdin")
-        .arg("-i")
-        .arg(input)
-        .arg("-map")
-        .arg("0:v:0")
-        .arg("-f")
-        .arg("rawvideo")
-        .arg("-pix_fmt")
-        .arg("rgb24")
-        .arg("-vsync")
-        .arg("0")
-        .arg("-")
-        .stdout(Stdio::piped())
-        .spawn()
-        .with_context(|| "failed to spawn ffmpeg")?;
-    let mut out = Vec::new();
-    child
-        .stdout
-        .as_mut()
-        .ok_or_else(|| anyhow!("no stdout"))?
-        .read_to_end(&mut out)
-        .with_context(|| "failed to read ffmpeg stdout")?;
-    let status = child.wait().with_context(|| "failed to wait ffmpeg")?;
-    if !status.success() {
-        return Err(anyhow!("ffmpeg failed"));
-    }
-    let frame_size = width
-        .checked_mul(height)
-        .ok_or_else(|| anyhow!("overflow"))?
-        .checked_mul(3)
-        .ok_or_else(|| anyhow!("overflow"))?;
-    let remainder = out.len() % frame_size;
-    if remainder != 0 {
-        out.truncate(out.len() - remainder);
-    }
-    Ok(out)
-}
-
-fn video_rs_keyframes(input: &str) -> Result<Vec<(usize, f64, String, usize)>> {
+fn videors_decode_rgb(input: &str, expected_width: usize, expected_height: usize) -> Result<(Vec<u8>, usize)> {
     video_rs::init().map_err(|e| anyhow!(format!("video-rs init failed: {e:?}")))?;
-    // Support local path or URL
     let url = if input.starts_with("http://") || input.starts_with("https://") || input.starts_with("rtsp://") {
         input.parse::<Url>().map_err(|e| anyhow!(format!("invalid url: {e}")))?
     } else {
@@ -183,32 +134,89 @@ fn video_rs_keyframes(input: &str) -> Result<Vec<(usize, f64, String, usize)>> {
     };
 
     let mut decoder = Decoder::new(url).map_err(|e| anyhow!(format!("decoder new failed: {e:?}")))?;
-    // Pick the first video stream
-    let streams = decoder.streams();
-    let v = streams
-        .iter()
-        .find(|s| s.codec_parameters().is_video())
-        .ok_or_else(|| anyhow!("no video stream"))?;
-    let v_index = v.index();
-    let time_base = v.time_base();
+    let mut width: usize = 0;
+    let mut height: usize = 0;
+    let mut bytes: Vec<u8> = Vec::new();
+    let mut frames: usize = 0;
 
-    let mut out = Vec::new();
-    let mut approx_index: usize = 0;
     for res in decoder.decode_iter() {
-        let (si, frame) = match res {
+        let (_ts, frame) = match res {
             Ok(x) => x,
             Err(e) => return Err(anyhow!(format!("decode error: {e:?}"))),
         };
-        if si != v_index { continue; }
-        let is_key = frame.is_key();
-        let pts = frame.pts().unwrap_or(0);
-        let time = (pts as f64) * time_base;
-        if is_key {
-            // pict_type/pkt_size are not directly available in many high-level decoders.
-            // We provide pict_type as "I" for keyframes; size unavailable -> 0.
-            out.push((approx_index, time, "I".to_string(), 0));
+        let shape = frame.shape();
+        if shape.len() != 3 { return Err(anyhow!("unexpected frame dims")); }
+        let h = shape[0];
+        let w = shape[1];
+        let c = shape[2];
+        if c != 3 { return Err(anyhow!("expected RGB channels=3")); }
+        if width == 0 { width = w; }
+        if height == 0 { height = h; }
+        if w != width || h != height { return Err(anyhow!("variable frame size not supported")); }
+        if expected_width != 0 && expected_height != 0 {
+            if w != expected_width || h != expected_height {
+                return Err(anyhow!("frame size mismatch with metadata"));
+            }
         }
-        approx_index += 1;
+        if let Some(slice) = frame.as_slice() {
+            bytes.extend_from_slice(slice);
+        } else {
+            let owned = frame.to_owned();
+            bytes.extend_from_slice(owned.as_slice().ok_or_else(|| anyhow!("failed to get owned slice"))?);
+        }
+        frames += 1;
+    }
+
+    if width == 0 || height == 0 { return Err(anyhow!("no frames decoded")); }
+    Ok((bytes, frames))
+}
+
+// ffmpeg CLI path removed in favor of video-rs
+
+fn ffprobe_keyframes(input: &str, fps: f64) -> Result<Vec<(usize, f64, String, usize)>> {
+    let output = Command::new("ffprobe")
+        .arg("-v")
+        .arg("error")
+        .arg("-select_streams")
+        .arg("v:0")
+        .arg("-show_frames")
+        .arg("-show_entries")
+        .arg("frame=key_frame,pict_type,pkt_pts_time,best_effort_timestamp_time,pkt_size")
+        .arg("-of")
+        .arg("json")
+        .arg(input)
+        .output()
+        .with_context(|| "failed to execute ffprobe for frames")?;
+    if !output.status.success() {
+        return Err(anyhow!(
+            "ffprobe frames failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    let parsed: FfprobeFrames = serde_json::from_slice(&output.stdout)
+        .with_context(|| "failed to parse ffprobe frames json")?;
+
+    let mut out: Vec<(usize, f64, String, usize)> = Vec::new();
+    for f in parsed.frames.into_iter() {
+        if f.key_frame.unwrap_or(0) != 1 {
+            continue;
+        }
+        let time_str = f
+            .pkt_pts_time
+            .as_ref()
+            .or(f.best_effort_timestamp_time.as_ref())
+            .cloned();
+        let time: f64 = match time_str {
+            Some(s) => s.parse::<f64>().unwrap_or(0.0),
+            None => 0.0,
+        };
+        let approx_index = (time * fps).round() as usize;
+        let pict = f.pict_type.unwrap_or_else(|| "?".to_string());
+        let size = f
+            .pkt_size
+            .and_then(|s| s.parse::<usize>().ok())
+            .unwrap_or(0);
+        out.push((approx_index, time, pict, size));
     }
     Ok(out)
 }
@@ -218,15 +226,17 @@ fn load_impl<'py>(
     input: &str,
 ) -> PyResult<(Bound<'py, PyArray4<u8>>, f64, f64, usize, usize, usize)> {
     let meta = ffprobe_meta(input).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-    let bytes = ffmpeg_decode_rgb(input, meta.width, meta.height)
+    let (bytes, frames) = videors_decode_rgb(input, meta.width, meta.height)
         .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
     let frame_size = meta.width * meta.height * 3;
     if frame_size == 0 {
         return Err(PyRuntimeError::new_err("invalid frame size"));
     }
-    let num_frames = bytes.len() / frame_size;
+    if bytes.len() != frames * frame_size {
+        return Err(PyRuntimeError::new_err("incomplete frame buffer"));
+    }
     let array =
-        ndarray::Array4::from_shape_vec((num_frames, meta.height, meta.width, 3usize), bytes)
+        ndarray::Array4::from_shape_vec((frames, meta.height, meta.width, 3usize), bytes)
             .map_err(|e| PyRuntimeError::new_err(format!("failed to build ndarray: {}", e)))?;
     let py_arr = PyArray4::from_owned_array(py, array);
     Ok((
@@ -235,7 +245,7 @@ fn load_impl<'py>(
         meta.duration,
         meta.width,
         meta.height,
-        num_frames,
+        frames,
     ))
 }
 
@@ -257,12 +267,14 @@ pub fn load_from_url<'py>(
 
 #[pyfunction]
 pub fn keyframes_from_path(path: &str) -> PyResult<Vec<(usize, f64, String, usize)>> {
-    video_rs_keyframes(path).map_err(|e| PyRuntimeError::new_err(e.to_string()))
+    let meta = ffprobe_meta(path).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+    ffprobe_keyframes(path, meta.fps).map_err(|e| PyRuntimeError::new_err(e.to_string()))
 }
 
 #[pyfunction]
 pub fn keyframes_from_url(url: &str) -> PyResult<Vec<(usize, f64, String, usize)>> {
-    video_rs_keyframes(url).map_err(|e| PyRuntimeError::new_err(e.to_string()))
+    let meta = ffprobe_meta(url).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+    ffprobe_keyframes(url, meta.fps).map_err(|e| PyRuntimeError::new_err(e.to_string()))
 }
 
 pub fn register_module(core_module: &Bound<'_, PyModule>) -> PyResult<()> {
