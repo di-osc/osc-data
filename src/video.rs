@@ -176,50 +176,29 @@ fn videors_decode_all(input: &str) -> Result<(Vec<u8>, usize, usize, usize, f64,
 
 // ffmpeg CLI path removed in favor of video-rs
 
-fn ffprobe_keyframes(input: &str, fps: f64) -> Result<Vec<(usize, f64, String, usize)>> {
-    let output = Command::new("ffprobe")
-        .arg("-v")
-        .arg("error")
-        .arg("-select_streams")
-        .arg("v:0")
-        .arg("-show_frames")
-        .arg("-show_entries")
-        .arg("frame=key_frame,pict_type,pkt_pts_time,best_effort_timestamp_time,pkt_size")
-        .arg("-of")
-        .arg("json")
-        .arg(input)
-        .output()
-        .with_context(|| "failed to execute ffprobe for frames")?;
-    if !output.status.success() {
-        return Err(anyhow!(
-            "ffprobe frames failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        ));
-    }
-    let parsed: FfprobeFrames = serde_json::from_slice(&output.stdout)
-        .with_context(|| "failed to parse ffprobe frames json")?;
+fn videors_keyframes(input: &str) -> Result<Vec<(usize, f64, String, usize)>> {
+    video_rs::init().map_err(|e| anyhow!(format!("video-rs init failed: {e:?}")))?;
+    let url = if input.starts_with("http://") || input.starts_with("https://") || input.starts_with("rtsp://") {
+        input.parse::<Url>().map_err(|e| anyhow!(format!("invalid url: {e}")))?
+    } else {
+        Url::from_file_path(input).map_err(|_| anyhow!("invalid file path"))?
+    };
 
+    let mut decoder = Decoder::new(url).map_err(|e| anyhow!(format!("decoder new failed: {e:?}")))?;
+    let time_base = decoder.time_base();
     let mut out: Vec<(usize, f64, String, usize)> = Vec::new();
-    for f in parsed.frames.into_iter() {
-        if f.key_frame.unwrap_or(0) != 1 {
-            continue;
+    let mut index: usize = 0;
+    for res in decoder.decode_raw_iter() {
+        let raw = match res { Ok(f) => f, Err(e) => return Err(anyhow!(format!("decode error: {e:?}"))) };
+        let kind_str = format!("{:?}", raw.kind());
+        // Consider I-frames as keyframes.
+        if kind_str.starts_with('I') {
+            let ts_opt = raw.timestamp();
+            let ts = video_rs::time::Time::new(ts_opt, time_base);
+            let time = ts.as_secs_f64();
+            out.push((index, time, kind_str, 0));
         }
-        let time_str = f
-            .pkt_pts_time
-            .as_ref()
-            .or(f.best_effort_timestamp_time.as_ref())
-            .cloned();
-        let time: f64 = match time_str {
-            Some(s) => s.parse::<f64>().unwrap_or(0.0),
-            None => 0.0,
-        };
-        let approx_index = (time * fps).round() as usize;
-        let pict = f.pict_type.unwrap_or_else(|| "?".to_string());
-        let size = f
-            .pkt_size
-            .and_then(|s| s.parse::<usize>().ok())
-            .unwrap_or(0);
-        out.push((approx_index, time, pict, size));
+        index += 1;
     }
     Ok(out)
 }
@@ -269,14 +248,12 @@ pub fn load_from_url<'py>(
 
 #[pyfunction]
 pub fn keyframes_from_path(path: &str) -> PyResult<Vec<(usize, f64, String, usize)>> {
-    let meta = ffprobe_meta(path).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-    ffprobe_keyframes(path, meta.fps).map_err(|e| PyRuntimeError::new_err(e.to_string()))
+    videors_keyframes(path).map_err(|e| PyRuntimeError::new_err(e.to_string()))
 }
 
 #[pyfunction]
 pub fn keyframes_from_url(url: &str) -> PyResult<Vec<(usize, f64, String, usize)>> {
-    let meta = ffprobe_meta(url).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-    ffprobe_keyframes(url, meta.fps).map_err(|e| PyRuntimeError::new_err(e.to_string()))
+    videors_keyframes(url).map_err(|e| PyRuntimeError::new_err(e.to_string()))
 }
 
 pub fn register_module(core_module: &Bound<'_, PyModule>) -> PyResult<()> {
