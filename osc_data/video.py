@@ -2,10 +2,8 @@ from __future__ import annotations
 
 from typing import Union
 from pathlib import Path
-from io import BytesIO
 
 import numpy as np
-import requests
 from docarray import BaseDoc
 from docarray.typing import NdArray
 from pydantic import Field, ConfigDict
@@ -23,9 +21,13 @@ class Video(BaseDoc):
         duration (float): Duration in seconds.
     """
 
-    model_config = ConfigDict(arbitrary_types_allowed=True, validate_assignment=True, extra="ignore")
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True, validate_assignment=True, extra="ignore"
+    )
 
-    uri: Union[str, Path] | None = Field(None, description="URL of the video file or local path.")
+    uri: Union[str, Path] | None = Field(
+        None, description="URL of the video file or local path."
+    )
     data: NdArray = Field(None, description="Frames data (N, H, W, 3) uint8 RGB.")
     fps: float | None = Field(None, description="Frames per second")
     duration: float | None = Field(None, description="Duration in seconds")
@@ -57,4 +59,3 @@ class Video(BaseDoc):
     @property
     def shape(self):
         return None if self.data is None else self.data.shape
-
