@@ -125,7 +125,7 @@ fn ffprobe_meta(input: &str) -> Result<VideoMeta> {
     Ok(VideoMeta { width, height, fps, duration })
 }
 
-fn videors_decode_rgb(input: &str, expected_width: usize, expected_height: usize) -> Result<(Vec<u8>, usize)> {
+fn videors_decode_all(input: &str) -> Result<(Vec<u8>, usize, usize, usize, f64, f64)> {
     video_rs::init().map_err(|e| anyhow!(format!("video-rs init failed: {e:?}")))?;
     let url = if input.starts_with("http://") || input.starts_with("https://") || input.starts_with("rtsp://") {
         input.parse::<Url>().map_err(|e| anyhow!(format!("invalid url: {e}")))?
@@ -138,9 +138,11 @@ fn videors_decode_rgb(input: &str, expected_width: usize, expected_height: usize
     let mut height: usize = 0;
     let mut bytes: Vec<u8> = Vec::new();
     let mut frames: usize = 0;
+    let mut first_ts: Option<f64> = None;
+    let mut last_ts: Option<f64> = None;
 
     for res in decoder.decode_iter() {
-        let (_ts, frame) = match res {
+        let (ts, frame) = match res {
             Ok(x) => x,
             Err(e) => return Err(anyhow!(format!("decode error: {e:?}"))),
         };
@@ -153,11 +155,6 @@ fn videors_decode_rgb(input: &str, expected_width: usize, expected_height: usize
         if width == 0 { width = w; }
         if height == 0 { height = h; }
         if w != width || h != height { return Err(anyhow!("variable frame size not supported")); }
-        if expected_width != 0 && expected_height != 0 {
-            if w != expected_width || h != expected_height {
-                return Err(anyhow!("frame size mismatch with metadata"));
-            }
-        }
         if let Some(slice) = frame.as_slice() {
             bytes.extend_from_slice(slice);
         } else {
@@ -165,10 +162,16 @@ fn videors_decode_rgb(input: &str, expected_width: usize, expected_height: usize
             bytes.extend_from_slice(owned.as_slice().ok_or_else(|| anyhow!("failed to get owned slice"))?);
         }
         frames += 1;
+
+        let ts_sec: f64 = ts.as_secs_f64();
+        if first_ts.is_none() { first_ts = Some(ts_sec); }
+        last_ts = Some(ts_sec);
     }
 
     if width == 0 || height == 0 { return Err(anyhow!("no frames decoded")); }
-    Ok((bytes, frames))
+    let duration = match (first_ts, last_ts) { (Some(a), Some(b)) if b >= a => b - a, _ => 0.0 };
+    let fps = if frames > 1 && duration > 0.0 { (frames as f64 - 1.0) / duration } else { 0.0 };
+    Ok((bytes, frames, width, height, fps, duration))
 }
 
 // ffmpeg CLI path removed in favor of video-rs
@@ -225,10 +228,9 @@ fn load_impl<'py>(
     py: Python<'py>,
     input: &str,
 ) -> PyResult<(Bound<'py, PyArray4<u8>>, f64, f64, usize, usize, usize)> {
-    let meta = ffprobe_meta(input).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-    let (bytes, frames) = videors_decode_rgb(input, meta.width, meta.height)
-        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-    let frame_size = meta.width * meta.height * 3;
+    let (bytes, frames, width, height, fps, duration) =
+        videors_decode_all(input).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+    let frame_size = width * height * 3;
     if frame_size == 0 {
         return Err(PyRuntimeError::new_err("invalid frame size"));
     }
@@ -236,15 +238,15 @@ fn load_impl<'py>(
         return Err(PyRuntimeError::new_err("incomplete frame buffer"));
     }
     let array =
-        ndarray::Array4::from_shape_vec((frames, meta.height, meta.width, 3usize), bytes)
+        ndarray::Array4::from_shape_vec((frames, height, width, 3usize), bytes)
             .map_err(|e| PyRuntimeError::new_err(format!("failed to build ndarray: {}", e)))?;
     let py_arr = PyArray4::from_owned_array(py, array);
     Ok((
         py_arr,
-        meta.fps,
-        meta.duration,
-        meta.width,
-        meta.height,
+        fps,
+        duration,
+        width,
+        height,
         frames,
     ))
 }
