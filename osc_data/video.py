@@ -59,3 +59,17 @@ class Video(BaseDoc):
     @property
     def shape(self):
         return None if self.data is None else self.data.shape
+
+    def keyframes(self):
+        """Return keyframe attributes as a list of tuples.
+
+        Each tuple is: (approx_index, time_sec, pict_type, pkt_size)
+        """
+        if self.uri is None:
+            raise ValueError("uri is not set")
+        u = str(self.uri)
+        if Path(u).exists():
+            items = _core.video.keyframes_from_path(u)
+        else:
+            items = _core.video.keyframes_from_url(u)
+        return list(items)

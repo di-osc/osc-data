@@ -33,6 +33,26 @@ struct FfFormat {
     duration: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+struct FfprobeFrames {
+    #[serde(default)]
+    frames: Vec<FfFrame>,
+}
+
+#[derive(Debug, Deserialize)]
+struct FfFrame {
+    #[serde(default)]
+    key_frame: Option<i32>,
+    #[serde(default)]
+    pict_type: Option<String>,
+    #[serde(default)]
+    pkt_pts_time: Option<String>,
+    #[serde(default)]
+    best_effort_timestamp_time: Option<String>,
+    #[serde(default)]
+    pkt_size: Option<String>,
+}
+
 #[derive(Debug, Clone)]
 struct VideoMeta {
     width: usize,
@@ -151,6 +171,54 @@ fn ffmpeg_decode_rgb(input: &str, width: usize, height: usize) -> Result<Vec<u8>
     Ok(out)
 }
 
+fn ffprobe_keyframes(input: &str, fps: f64) -> Result<Vec<(usize, f64, String, usize)>> {
+    let output = Command::new("ffprobe")
+        .arg("-v")
+        .arg("error")
+        .arg("-select_streams")
+        .arg("v:0")
+        .arg("-show_frames")
+        .arg("-show_entries")
+        .arg("frame=key_frame,pict_type,pkt_pts_time,best_effort_timestamp_time,pkt_size")
+        .arg("-of")
+        .arg("json")
+        .arg(input)
+        .output()
+        .with_context(|| "failed to execute ffprobe for frames")?;
+    if !output.status.success() {
+        return Err(anyhow!(
+            "ffprobe frames failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    let parsed: FfprobeFrames = serde_json::from_slice(&output.stdout)
+        .with_context(|| "failed to parse ffprobe frames json")?;
+
+    let mut out: Vec<(usize, f64, String, usize)> = Vec::new();
+    for f in parsed.frames.into_iter() {
+        if f.key_frame.unwrap_or(0) != 1 {
+            continue;
+        }
+        let time_str = f
+            .pkt_pts_time
+            .as_ref()
+            .or(f.best_effort_timestamp_time.as_ref())
+            .cloned();
+        let time: f64 = match time_str {
+            Some(s) => s.parse::<f64>().unwrap_or(0.0),
+            None => 0.0,
+        };
+        let approx_index = (time * fps).round() as usize;
+        let pict = f.pict_type.unwrap_or_else(|| "?".to_string());
+        let size = f
+            .pkt_size
+            .and_then(|s| s.parse::<usize>().ok())
+            .unwrap_or(0);
+        out.push((approx_index, time, pict, size));
+    }
+    Ok(out)
+}
+
 fn load_impl<'py>(
     py: Python<'py>,
     input: &str,
@@ -193,10 +261,26 @@ pub fn load_from_url<'py>(
     load_impl(py, url)
 }
 
+#[pyfunction]
+pub fn keyframes_from_path(path: &str) -> PyResult<Vec<(usize, f64, String, usize)>> {
+    let meta = ffprobe_meta(path).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+    ffprobe_keyframes(path, meta.fps)
+        .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+}
+
+#[pyfunction]
+pub fn keyframes_from_url(url: &str) -> PyResult<Vec<(usize, f64, String, usize)>> {
+    let meta = ffprobe_meta(url).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+    ffprobe_keyframes(url, meta.fps)
+        .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+}
+
 pub fn register_module(core_module: &Bound<'_, PyModule>) -> PyResult<()> {
     let video_module = PyModule::new(core_module.py(), "video")?;
     video_module.add_function(wrap_pyfunction!(load_from_path, &video_module)?)?;
     video_module.add_function(wrap_pyfunction!(load_from_url, &video_module)?)?;
+    video_module.add_function(wrap_pyfunction!(keyframes_from_path, &video_module)?)?;
+    video_module.add_function(wrap_pyfunction!(keyframes_from_url, &video_module)?)?;
     core_module.add_submodule(&video_module)?;
     Ok(())
 }
