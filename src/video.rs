@@ -176,7 +176,7 @@ fn videors_decode_all(input: &str) -> Result<(Vec<u8>, usize, usize, usize, f64,
 
 // ffmpeg CLI path removed in favor of video-rs
 
-fn videors_keyframes(input: &str) -> Result<Vec<(usize, f64, String, usize)>> {
+fn videors_keyframes(input: &str) -> Result<Vec<(usize, f64)>> {
     video_rs::init().map_err(|e| anyhow!(format!("video-rs init failed: {e:?}")))?;
     let url = if input.starts_with("http://") || input.starts_with("https://") || input.starts_with("rtsp://") {
         input.parse::<Url>().map_err(|e| anyhow!(format!("invalid url: {e}")))?
@@ -186,7 +186,7 @@ fn videors_keyframes(input: &str) -> Result<Vec<(usize, f64, String, usize)>> {
 
     let mut decoder = Decoder::new(url).map_err(|e| anyhow!(format!("decoder new failed: {e:?}")))?;
     let time_base = decoder.time_base();
-    let mut out: Vec<(usize, f64, String, usize)> = Vec::new();
+    let mut out: Vec<(usize, f64)> = Vec::new();
     let mut index: usize = 0;
     for res in decoder.decode_raw_iter() {
         let raw = match res { Ok(f) => f, Err(e) => return Err(anyhow!(format!("decode error: {e:?}"))) };
@@ -196,7 +196,7 @@ fn videors_keyframes(input: &str) -> Result<Vec<(usize, f64, String, usize)>> {
             let ts_opt = raw.timestamp();
             let ts = video_rs::time::Time::new(ts_opt, time_base);
             let time = ts.as_secs_f64();
-            out.push((index, time, kind_str, 0));
+            out.push((index, time));
         }
         index += 1;
     }
@@ -247,12 +247,12 @@ pub fn load_from_url<'py>(
 }
 
 #[pyfunction]
-pub fn keyframes_from_path(path: &str) -> PyResult<Vec<(usize, f64, String, usize)>> {
+pub fn keyframes_from_path(path: &str) -> PyResult<Vec<(usize, f64)>> {
     videors_keyframes(path).map_err(|e| PyRuntimeError::new_err(e.to_string()))
 }
 
 #[pyfunction]
-pub fn keyframes_from_url(url: &str) -> PyResult<Vec<(usize, f64, String, usize)>> {
+pub fn keyframes_from_url(url: &str) -> PyResult<Vec<(usize, f64)>> {
     videors_keyframes(url).map_err(|e| PyRuntimeError::new_err(e.to_string()))
 }
 

@@ -61,10 +61,7 @@ class Video(BaseDoc):
         return None if self.data is None else self.data.shape
 
     def keyframes(self):
-        """Return keyframe attributes as a list of tuples.
-
-        Each tuple is: (approx_index, time_sec, pict_type, pkt_size)
-        """
+        """Return keyframes as a list of (index, time_sec)."""
         if self.uri is None:
             raise ValueError("uri is not set")
         u = str(self.uri)
