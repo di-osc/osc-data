@@ -28,7 +28,9 @@ class Video(BaseDoc):
     uri: Union[str, Path, VideoUrl] | None = Field(
         None, description="URL of the video file or local path."
     )
-    data: Union[NdArray, VideoNdArray] = Field(None, description="Frames data (N, H, W, 3) uint8 RGB.")
+    data: Union[NdArray, VideoNdArray] = Field(
+        None, description="Frames data (N, H, W, 3) uint8 RGB."
+    )
     fps: float | None = Field(None, description="Frames per second")
     duration: float | None = Field(None, description="Duration in seconds")
     width: int | None = Field(None, description="Frame width")
@@ -41,22 +43,22 @@ class Video(BaseDoc):
         try:
             if self.uri is None:
                 raise ValueError("uri is not set")
-            
+
             # Handle VideoUrl type
-            if hasattr(self.uri, 'load'):
+            if hasattr(self.uri, "load"):
                 result = self.uri.load()
                 self.data = result.video
                 self.key_frames = result.key_frame_indices
                 # Extract other properties if available
-                if hasattr(result, 'fps'):
+                if hasattr(result, "fps"):
                     self.fps = float(result.fps)
-                if hasattr(result, 'duration'):
+                if hasattr(result, "duration"):
                     self.duration = float(result.duration)
-                if hasattr(result, 'width'):
+                if hasattr(result, "width"):
                     self.width = int(result.width)
-                if hasattr(result, 'height'):
+                if hasattr(result, "height"):
                     self.height = int(result.height)
-                if hasattr(result, 'num_frames'):
+                if hasattr(result, "num_frames"):
                     self.num_frames = int(result.num_frames)
             else:
                 # Handle string/Path type
@@ -92,10 +94,12 @@ class Video(BaseDoc):
 
     def display(self):
         """Display the video data."""
-        if hasattr(self.data, 'display'):
+        if hasattr(self.data, "display"):
             self.data.display()
         else:
-            print(f"Video data shape: {self.data.shape if self.data is not None else 'None'}")
+            print(
+                f"Video data shape: {self.data.shape if self.data is not None else 'None'}"
+            )
 
     @property
     def shape(self):

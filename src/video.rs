@@ -2,21 +2,25 @@ use anyhow::{anyhow, Result};
 use numpy::PyArray4;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
- 
+
 use video_rs::decode::Decoder;
 use video_rs::Url;
 
- 
-
 fn videors_decode_all(input: &str) -> Result<(Vec<u8>, usize, usize, usize, f64, f64)> {
     video_rs::init().map_err(|e| anyhow!(format!("video-rs init failed: {e:?}")))?;
-    let url = if input.starts_with("http://") || input.starts_with("https://") || input.starts_with("rtsp://") {
-        input.parse::<Url>().map_err(|e| anyhow!(format!("invalid url: {e}")))?
+    let url = if input.starts_with("http://")
+        || input.starts_with("https://")
+        || input.starts_with("rtsp://")
+    {
+        input
+            .parse::<Url>()
+            .map_err(|e| anyhow!(format!("invalid url: {e}")))?
     } else {
         Url::from_file_path(input).map_err(|_| anyhow!("invalid file path"))?
     };
 
-    let mut decoder = Decoder::new(url).map_err(|e| anyhow!(format!("decoder new failed: {e:?}")))?;
+    let mut decoder =
+        Decoder::new(url).map_err(|e| anyhow!(format!("decoder new failed: {e:?}")))?;
     let mut width: usize = 0;
     let mut height: usize = 0;
     let mut bytes: Vec<u8> = Vec::new();
@@ -30,30 +34,55 @@ fn videors_decode_all(input: &str) -> Result<(Vec<u8>, usize, usize, usize, f64,
             Err(e) => return Err(anyhow!(format!("decode error: {e:?}"))),
         };
         let shape = frame.shape();
-        if shape.len() != 3 { return Err(anyhow!("unexpected frame dims")); }
+        if shape.len() != 3 {
+            return Err(anyhow!("unexpected frame dims"));
+        }
         let h = shape[0];
         let w = shape[1];
         let c = shape[2];
-        if c != 3 { return Err(anyhow!("expected RGB channels=3")); }
-        if width == 0 { width = w; }
-        if height == 0 { height = h; }
-        if w != width || h != height { return Err(anyhow!("variable frame size not supported")); }
+        if c != 3 {
+            return Err(anyhow!("expected RGB channels=3"));
+        }
+        if width == 0 {
+            width = w;
+        }
+        if height == 0 {
+            height = h;
+        }
+        if w != width || h != height {
+            return Err(anyhow!("variable frame size not supported"));
+        }
         if let Some(slice) = frame.as_slice() {
             bytes.extend_from_slice(slice);
         } else {
             let owned = frame.to_owned();
-            bytes.extend_from_slice(owned.as_slice().ok_or_else(|| anyhow!("failed to get owned slice"))?);
+            bytes.extend_from_slice(
+                owned
+                    .as_slice()
+                    .ok_or_else(|| anyhow!("failed to get owned slice"))?,
+            );
         }
         frames += 1;
 
         let ts_sec: f64 = ts.as_secs_f64();
-        if first_ts.is_none() { first_ts = Some(ts_sec); }
+        if first_ts.is_none() {
+            first_ts = Some(ts_sec);
+        }
         last_ts = Some(ts_sec);
     }
 
-    if width == 0 || height == 0 { return Err(anyhow!("no frames decoded")); }
-    let duration = match (first_ts, last_ts) { (Some(a), Some(b)) if b >= a => b - a, _ => 0.0 };
-    let fps = if frames > 1 && duration > 0.0 { (frames as f64 - 1.0) / duration } else { 0.0 };
+    if width == 0 || height == 0 {
+        return Err(anyhow!("no frames decoded"));
+    }
+    let duration = match (first_ts, last_ts) {
+        (Some(a), Some(b)) if b >= a => b - a,
+        _ => 0.0,
+    };
+    let fps = if frames > 1 && duration > 0.0 {
+        (frames as f64 - 1.0) / duration
+    } else {
+        0.0
+    };
     Ok((bytes, frames, width, height, fps, duration))
 }
 
@@ -61,18 +90,27 @@ fn videors_decode_all(input: &str) -> Result<(Vec<u8>, usize, usize, usize, f64,
 
 fn videors_keyframes(input: &str) -> Result<Vec<(usize, f64)>> {
     video_rs::init().map_err(|e| anyhow!(format!("video-rs init failed: {e:?}")))?;
-    let url = if input.starts_with("http://") || input.starts_with("https://") || input.starts_with("rtsp://") {
-        input.parse::<Url>().map_err(|e| anyhow!(format!("invalid url: {e}")))?
+    let url = if input.starts_with("http://")
+        || input.starts_with("https://")
+        || input.starts_with("rtsp://")
+    {
+        input
+            .parse::<Url>()
+            .map_err(|e| anyhow!(format!("invalid url: {e}")))?
     } else {
         Url::from_file_path(input).map_err(|_| anyhow!("invalid file path"))?
     };
 
-    let mut decoder = Decoder::new(url).map_err(|e| anyhow!(format!("decoder new failed: {e:?}")))?;
+    let mut decoder =
+        Decoder::new(url).map_err(|e| anyhow!(format!("decoder new failed: {e:?}")))?;
     let time_base = decoder.time_base();
     let mut out: Vec<(usize, f64)> = Vec::new();
     let mut index: usize = 0;
     for res in decoder.decode_raw_iter() {
-        let raw = match res { Ok(f) => f, Err(e) => return Err(anyhow!(format!("decode error: {e:?}"))) };
+        let raw = match res {
+            Ok(f) => f,
+            Err(e) => return Err(anyhow!(format!("decode error: {e:?}"))),
+        };
         let kind_str = format!("{:?}", raw.kind());
         // Consider I-frames as keyframes.
         if kind_str.starts_with('I') {
@@ -99,18 +137,10 @@ fn load_impl<'py>(
     if bytes.len() != frames * frame_size {
         return Err(PyRuntimeError::new_err("incomplete frame buffer"));
     }
-    let array =
-        ndarray::Array4::from_shape_vec((frames, height, width, 3usize), bytes)
-            .map_err(|e| PyRuntimeError::new_err(format!("failed to build ndarray: {}", e)))?;
+    let array = ndarray::Array4::from_shape_vec((frames, height, width, 3usize), bytes)
+        .map_err(|e| PyRuntimeError::new_err(format!("failed to build ndarray: {}", e)))?;
     let py_arr = PyArray4::from_owned_array(py, array);
-    Ok((
-        py_arr,
-        fps,
-        duration,
-        width,
-        height,
-        frames,
-    ))
+    Ok((py_arr, fps, duration, width, height, frames))
 }
 
 #[pyfunction]
