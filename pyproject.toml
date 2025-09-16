@@ -13,6 +13,7 @@ dependencies = [
     "docarray",
     "requests>=2.32.5",
     "librosa>=0.11.0",
+    "av>=10.0.0",
 ]
 
 [tool.maturin]
