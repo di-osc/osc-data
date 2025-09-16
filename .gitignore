@@ -175,5 +175,5 @@ target/
 .venv
 *.ipynb
 *.svg
-cargo.lock
+Cargo.lock
 uv.lock
