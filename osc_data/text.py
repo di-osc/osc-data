@@ -149,6 +149,8 @@ class TextNormalizer(BaseModel):
     model_config: ConfigDict = ConfigDict(arbitrary_types_allowed=True)
 
     remove_erhua: bool = False
+    remove_emoji: bool = False
+    to_half_width: bool = False
     tagger: KaldiTextNormalizer = None
     reorder: TokenParser = None
     verbalizer: KaldiTextNormalizer = None
@@ -165,6 +167,10 @@ class TextNormalizer(BaseModel):
         return self
 
     def normalize(self, text: str) -> str:
+        if self.remove_emoji:
+            text = core_text.remove_emojis(text)
+        if self.to_half_width:
+            text = core_text.to_half_width(text)
         text = self.tagger(text)
         text = self.reorder.reorder(text)
         text = self.verbalizer(text)
