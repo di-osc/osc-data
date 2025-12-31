@@ -23,6 +23,7 @@ class TextStreamSentencizer:
             l1_ends (List[str], optional): 优先级最高的切分字符. Defaults to ["!", "?", "。", "？", "！", "；", ";"].
             l2_ends (List[str], optional): l2优先级切分字符，只有l1切分后无句子并且达到l2阈值才会切分. Defaults to ["、", ",", "，"].
             l3_ends (List[str], optional): l3优先级切分字符,规则同l2. Defaults to [":", "："].
+            remove_emoji (bool, optional): 是否移除emoji. Defaults to False.
         """
         super().__init__()
         assert check_all_chars(l1_ends), "l1_ends must be a list of chars"
