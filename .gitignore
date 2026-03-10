@@ -177,3 +177,4 @@ target/
 *.svg
 Cargo.lock
 uv.lock
+.DS_Store
