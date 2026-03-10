@@ -1,6 +1,6 @@
 [package]
 name = "osc-data"
-version = "0.1.0"
+version = "0.2.7"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -16,3 +16,4 @@ regex = "1.11.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 anyhow = "1"
+image = "0.25.0"
