@@ -239,7 +239,7 @@ class TestImageBytes:
         assert isinstance(img_bytes, bytes)
         assert len(img_bytes) > 0
         # PNG magic bytes
-        assert img_bytes[:8] == b'\x89PNG\r\n\x1a\n'
+        assert img_bytes[:8] == b"\x89PNG\r\n\x1a\n"
 
     def test_to_bytes_jpeg(self):
         """Test converting image to JPEG bytes."""
@@ -250,7 +250,7 @@ class TestImageBytes:
         assert isinstance(img_bytes, bytes)
         assert len(img_bytes) > 0
         # JPEG magic bytes
-        assert img_bytes[:3] == b'\xff\xd8\xff'
+        assert img_bytes[:3] == b"\xff\xd8\xff"
 
     def test_from_bytes(self):
         """Test creating image from bytes."""

@@ -41,7 +41,9 @@ class Image(BaseDoc):
     width: int | None = Field(None, description="Image width in pixels.")
     height: int | None = Field(None, description="Image height in pixels.")
     color_mode: str | None = Field(None, description="Color mode (RGB, RGBA, L).")
-    source_format: str | None = Field(None, description="Source file format (png, jpeg, webp).")
+    source_format: str | None = Field(
+        None, description="Source file format (png, jpeg, webp)."
+    )
 
     def load(self) -> "Image":
         """Load the image from local path or URL.
@@ -86,7 +88,9 @@ class Image(BaseDoc):
 
         return self
 
-    def save(self, path: str, file_format: str | None = None, quality: int = 95) -> "Image":
+    def save(
+        self, path: str, file_format: str | None = None, quality: int = 95
+    ) -> "Image":
         """Save the image to local path.
 
         Args:
@@ -315,6 +319,10 @@ class Image(BaseDoc):
             return "RGB"
         elif "rgba8" in color_mode_lower:
             return "RGBA"
-        elif "luma8" in color_mode_lower or "gray" in color_mode_lower or "l8" in color_mode_lower:
+        elif (
+            "luma8" in color_mode_lower
+            or "gray" in color_mode_lower
+            or "l8" in color_mode_lower
+        ):
             return "L"
         return color_mode_str.upper()
