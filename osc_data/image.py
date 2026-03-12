@@ -1,5 +1,7 @@
 from __future__ import annotations
+import math
 from pathlib import Path
+
 import requests
 
 import numpy as np
@@ -207,6 +209,50 @@ class Image(BaseDoc):
         return Image(
             uri=self.uri,
             data=cropped_data,
+            width=width,
+            height=height,
+            color_mode=self.color_mode,
+        )
+
+    def resize_and_center_crop(self, width: int, height: int) -> "Image":
+        """先等比缩放使图像覆盖目标尺寸，再居中裁剪到精确尺寸。
+
+        缩放使用 Lanczos3 高质量滤波器，裁剪从中心取目标区域。
+        适用于需要固定尺寸且不留黑边的场景（如模型输入预处理）。
+
+        Args:
+            width (int): 目标宽度。
+            height (int): 目标高度。
+
+        Returns:
+            Image: 新的 Image 对象，尺寸为 (width, height)。
+
+        Raises:
+            ValueError: 图像数据未加载时抛出。
+
+        Examples:
+            >>> from osc_data.image import Image
+            >>> img = Image(uri="photo.jpg").load()  # 假设 800x600
+            >>> result = img.resize_and_center_crop(512, 512)
+            >>> result.width, result.height
+            (512, 512)
+        """
+        if self.data is None:
+            raise ValueError("Image data is not set")
+
+        scale = max(height / self.height, width / self.width)
+        final_h = math.ceil(scale * self.height)
+        final_w = math.ceil(scale * self.width)
+
+        resized = resize_image(self.data, final_h, final_w)
+
+        crop_x = (final_w - width) // 2
+        crop_y = (final_h - height) // 2
+        cropped = crop_image(resized, crop_x, crop_y, width, height)
+
+        return Image(
+            uri=self.uri,
+            data=cropped,
             width=width,
             height=height,
             color_mode=self.color_mode,

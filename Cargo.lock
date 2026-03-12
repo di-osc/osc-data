@@ -679,7 +679,7 @@ checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
 
 [[package]]
 name = "osc-data"
-version = "0.2.9"
+version = "0.2.9-post0"
 dependencies = [
  "anyhow",
  "image",
