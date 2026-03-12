@@ -11,7 +11,7 @@
 
 ## 特性
 
-- **文本处理**：流式句子分割，支持中英文混合文本
+- **文本处理**：文本正则化（TN）、去 emoji、全角转半角、流式句子分割，支持中英文混合文本
 - **图像处理**：加载、保存、格式转换、缩放、裁剪，支持 PNG/JPEG/WebP/BMP/GIF/TIFF
 - **音频处理**：音频加载、特征提取（分贝计算等）
 - **视频处理**：视频加载、帧提取、关键帧分割、音频提取与合并、保存
@@ -87,6 +87,29 @@ img.save("output.jpg", file_format="jpeg", quality=95)
 # 批量处理
 images = [img1, img2, img3]
 resized_batch = Image.batch_resize_images(images, 256, 256)
+```
+
+### 文本处理
+
+```python
+from osc_data.text import TextNormalizer, TextCleaner
+
+# 文本正则化（TN）：数字、日期、货币等转为口语化表达
+normalizer = TextNormalizer()
+result = normalizer.normalize("我有100元")
+print(result)  # "我有一百元"
+
+# 可选参数
+normalizer = TextNormalizer(
+    remove_erhua=True,   # 去除儿化音
+    remove_emoji=True,   # 去除 emoji
+    to_half_width=True,  # 全角转半角
+)
+
+# 轻量文本清洗（不做 TN）
+cleaner = TextCleaner(remove_emoji=True, to_half_width=True)
+result = cleaner.clean("Ｈｅｌｌｏ！😀你好")
+print(result)  # "Hello!你好"
 ```
 
 ### 文本流处理
@@ -184,6 +207,23 @@ db = compute_decibel(audio.data, audio.sampling_rate)
 | `from_bytes(data)` | 从字节创建图片 |
 | `batch_resize_images(images, width, height)` | 批量缩放 |
 | `display()` | 显示图片 (Jupyter) |
+
+### TextNormalizer 类
+
+| 属性/方法 | 说明 |
+|-----------|------|
+| `remove_erhua` | 是否去除儿化音，默认 False |
+| `remove_emoji` | 是否去除 emoji，默认 False |
+| `to_half_width` | 是否全角转半角，默认 False |
+| `normalize(text)` | 执行文本正则化（TN），返回口语化文本 |
+
+### TextCleaner 类
+
+| 属性/方法 | 说明 |
+|-----------|------|
+| `remove_emoji` | 是否去除 emoji，默认 False |
+| `to_half_width` | 是否全角转半角，默认 False |
+| `clean(text)` | 执行文本清洗，返回清洗后文本 |
 
 ### TextStreamSentencizer 类
 
