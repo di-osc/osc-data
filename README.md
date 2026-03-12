@@ -29,13 +29,13 @@
 
 ```bash
 # 从 PyPI 安装 
-pip install osc-data
+pip install osc-data --upgrade
 
 # 从 Git 仓库直接安装
 pip install git+https://github.com/username/osc-data.git
 
 # 安装指定版本
-pip install osc-data==0.2.8
+pip install osc-data==0.2.9
 ```
 
 ### 从源码安装
