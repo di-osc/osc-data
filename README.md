@@ -14,7 +14,8 @@
 - **文本处理**：流式句子分割，支持中英文混合文本
 - **图像处理**：加载、保存、格式转换、缩放、裁剪，支持 PNG/JPEG/WebP/BMP/GIF/TIFF
 - **音频处理**：音频加载、特征提取（分贝计算等）
-- **视频处理**：视频加载、帧提取、关键帧分割、保存
+- **视频处理**：视频加载、帧提取、关键帧分割、音频提取与合并、保存
+- **音视频同步**：音频时长自动调整（循环/静音填充）、音频截断警告
 - **高性能**：核心算法使用 Rust + PyO3 实现，Python 端使用 DocArray 类型系统
 
 ## 安装
@@ -34,7 +35,7 @@ pip install osc-data
 pip install git+https://github.com/username/osc-data.git
 
 # 安装指定版本
-pip install osc-data==0.2.6
+pip install osc-data==0.2.8
 ```
 
 ### 从源码安装
@@ -67,7 +68,8 @@ img = Image(uri="./photo.jpg").load()
 # img = Image(uri="https://example.com/image.png").load()
 
 # 查看图片信息
-print(f"尺寸: {img.width}x{img.height}, 格式: {img.format}")
+print(f"尺寸: {img.width}x{img.height}, 色彩模式: {img.color_mode}")
+print(f"源格式: {img.source_format}")  # png, jpeg 等
 
 # 格式转换
 rgb_img = img.to_rgb()
@@ -78,9 +80,9 @@ small_img = img.resize(256, 256)
 # 裁剪
 cropped = img.crop(100, 100, 200, 200)
 
-# 保存
+# 保存 (使用 file_format 指定输出格式)
 img.save("output.png")
-img.save("output.jpg", format="jpeg", quality=95)
+img.save("output.jpg", file_format="jpeg", quality=95)
 
 # 批量处理
 images = [img1, img2, img3]
@@ -112,14 +114,33 @@ print(sentences)
 
 ```python
 from osc_data.video import Video
+from osc_data.audio import Audio
 
-# 加载视频
+# 加载视频（或使用示例视频）
 video = Video(uri="./video.mp4").load()
+# video = Video().load_example()  # 加载内置示例视频
 
-print(f"分辨率: {video.data.shape}, FPS: {video.fps}, 时长: {video.duration}s")
+print(f"分辨率: {video.width}x{video.height}, FPS: {video.fps}, 时长: {video.duration}s")
 
 # 按关键帧分割
 segments = video.split_by_key_frames(min_split_duration_s=5)
+
+# 提取音频
+audio = video.extract_audio()
+
+# 合并音频（自动调整音频时长匹配视频）
+new_audio = Audio(uri="./music.mp3").load()
+merged = video.merge_audio(new_audio, "output.mp4", audio_mode="loop")
+# audio_mode: "loop" 循环填充, "silence" 静音填充
+
+# 移除音频
+no_audio = video.remove_audio("silent.mp4")
+
+# 静态方法合并视频和音频
+combined = Video.combine_video_audio(video, audio, "final.mp4")
+
+# 在 Jupyter 中显示视频
+video.display()
 
 # 保存视频
 video.save("output.mp4", format="mp4", codec="h264")
@@ -144,16 +165,21 @@ db = compute_decibel(audio.data, audio.sampling_rate)
 
 ### Image 类
 
-| 方法 | 说明 |
-|------|------|
+| 属性/方法 | 说明 |
+|-----------|------|
+| `uri` | 图片路径或 URL |
+| `color_mode` | 色彩模式 (RGB/RGBA/L) |
+| `source_format` | 源文件格式 (png/jpeg/webp) |
+| `width`, `height` | 图片尺寸 |
 | `load()` | 从本地路径或 URL 加载图片 |
-| `save(path, format, quality)` | 保存图片到本地 |
+| `save(path, file_format, quality)` | 保存图片到本地 |
 | `to_rgb()` | 转换为 RGB 格式 |
 | `resize(width, height)` | 缩放图片 (Lanczos3) |
 | `crop(x, y, width, height)` | 裁剪图片 |
-| `to_bytes(format, quality)` | 转换为字节 |
+| `to_bytes(file_format, quality)` | 转换为字节 |
 | `from_bytes(data)` | 从字节创建图片 |
 | `batch_resize_images(images, width, height)` | 批量缩放 |
+| `display()` | 显示图片 (Jupyter) |
 
 ### TextStreamSentencizer 类
 
@@ -165,11 +191,27 @@ db = compute_decibel(audio.data, audio.sampling_rate)
 
 ### Video 类
 
-| 方法 | 说明 |
-|------|------|
+| 属性/方法 | 说明 |
+|-----------|------|
+| `uri` | 视频路径或 URL |
+| `width`, `height` | 视频分辨率 |
+| `fps` | 帧率 |
+| `duration` | 时长（秒） |
+| `has_audio` | 是否有音轨 |
 | `load()` | 加载视频 |
-| `split_by_key_frames(min_split_duration_s)` | 按关键帧分割 |
+| `load_example()` | 加载内置示例视频 |
 | `save(path, format, codec)` | 保存视频 |
+| `display()` | 显示视频 (Jupyter) |
+| `split_by_key_frames(min_split_duration_s)` | 按关键帧分割 |
+| `extract_audio()` | 提取音频 |
+| `merge_audio(audio, output_path, audio_mode)` | 合并音频（替换原音频） |
+| `remove_audio(output_path)` | 移除音频 |
+| `combine_video_audio(video, audio, output_path)` | 静态方法：合并视频和音频 |
+
+**音频时长处理**：
+- `audio_mode="loop"`：循环播放音频填充（默认）
+- `audio_mode="silence"`：静音填充
+- 音频长于视频时自动截断并发出警告
 
 ## 项目结构
 
@@ -185,6 +227,7 @@ osc-data/
 │   └── assets/         # 示例资源
 │       ├── image/      # 示例图片
 │       ├── audio/      # 示例音频
+│       ├── video/      # 示例视频
 │       └── text/       # 示例文本
 ├── src/                # Rust 核心模块
 │   ├── lib.rs          # 模块入口
@@ -218,6 +261,7 @@ pytest
 
 # 运行特定模块测试
 pytest tests/test_image.py -v
+pytest tests/test_video.py -v
 pytest tests/test_sentencizer.py -v
 ```
 
@@ -240,6 +284,7 @@ cargo fmt
 - `requests`: HTTP 请求
 - `librosa` >= 0.11.0: 音频处理
 - `av` >= 10.0.0: 视频/音频编解码
+- `wasabi` >= 1.1.0: 格式化日志输出
 
 ### Rust 依赖
 - `pyo3` >= 0.25.0: Python 绑定
