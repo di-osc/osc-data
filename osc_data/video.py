@@ -27,6 +27,7 @@ class Video(BaseDoc):
         fps (float): Frames per second.
         duration (float): Duration in seconds.
         has_audio (bool): Whether the video has audio track.
+        prompt (str): Prompt text used to generate this video (for AI-generated videos).
     """
 
     model_config = ConfigDict(
@@ -41,6 +42,7 @@ class Video(BaseDoc):
     fps: int | None = Field(None, description="Frames per second")
     duration: float | None = Field(None, description="Duration in seconds")
     has_audio: bool = Field(False, description="Whether the video has audio track.")
+    prompt: str | None = Field(None, description="Prompt text used to generate this video.")
 
     def load(self) -> "Video":
         """Load the video from local path or URL using av library."""
@@ -217,6 +219,7 @@ class Video(BaseDoc):
             fps=self.fps,
             duration=self.duration,
             has_audio=self.has_audio,
+            prompt=self.prompt,
         )
 
     def resize(self, width: int, height: int) -> "Video":
@@ -254,6 +257,7 @@ class Video(BaseDoc):
             fps=self.fps,
             duration=self.duration,
             has_audio=self.has_audio,
+            prompt=self.prompt,
         )
 
     @property
