@@ -142,6 +142,10 @@ combined = Video.combine_video_audio(video, audio, "final.mp4")
 # 在 Jupyter 中显示视频
 video.display()
 
+# 根据宽高比计算最佳尺寸
+best_w, best_h = video.get_best_size((9, 16))
+print(f"9:16 最佳尺寸: {best_w}x{best_h}")
+
 # 保存视频
 video.save("output.mp4", format="mp4", codec="h264")
 ```
@@ -205,6 +209,7 @@ db = compute_decibel(audio.data, audio.sampling_rate)
 | `split_by_key_frames(min_split_duration_s)` | 按关键帧分割 |
 | `extract_audio()` | 提取音频 |
 | `merge_audio(audio, output_path, audio_mode)` | 合并音频（替换原音频） |
+| `get_best_size(ratio)` | 根据宽高比计算最佳尺寸 |
 | `remove_audio(output_path)` | 移除音频 |
 | `combine_video_audio(video, audio, output_path)` | 静态方法：合并视频和音频 |
 

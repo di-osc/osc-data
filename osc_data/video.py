@@ -42,7 +42,9 @@ class Video(BaseDoc):
     fps: int | None = Field(None, description="Frames per second")
     duration: float | None = Field(None, description="Duration in seconds")
     has_audio: bool = Field(False, description="Whether the video has audio track.")
-    prompt: str | None = Field(None, description="Prompt text used to generate this video.")
+    prompt: str | None = Field(
+        None, description="Prompt text used to generate this video."
+    )
 
     def load(self) -> "Video":
         """Load the video from local path or URL using av library."""
@@ -139,12 +141,29 @@ class Video(BaseDoc):
         return videos
 
     def save(self, path: str, format: str = "mp4", codec: str = "h264"):
-        """Save the video to local path.
-        format: https://docs.opencv.org/4.10.0/dd/d9e/group__videoio__flags__base.html#gaeb8dd9c89c10a5c63c139bf7c4f5704d
+        """将视频帧数据编码并保存到本地文件。
+
+        使用 PyAV 将内存中的 RGB 帧数据编码为指定格式的视频文件。
+        像素格式固定为 yuv420p，适配主流播放器。
+
         Args:
-            path (str): Local path to save the video.
-            format (str): Format to save the video. https://docs.opencv.org/4.10.0/dd/d9e/group__videoio__flags__base.html#gaeb8dd9c89c10a5c63c139bf7c4f5704d
-            codec (str): Codec to save the video.
+            path (str): 保存路径，文件已存在时抛出 FileExistsError。
+            format (str): 容器格式，默认 "mp4"。常用值: "mp4", "avi", "mkv", "mov"。
+            codec (str): 视频编码器，默认 "h264"。常用值: "h264", "hevc", "mpeg4", "vp9"。
+
+        Returns:
+            Video: 返回自身，支持链式调用。
+
+        Raises:
+            FileExistsError: 目标文件已存在。
+            ValueError: 视频数据或 fps 未设置。
+            RuntimeError: 编码或写入失败。
+
+        Examples:
+            >>> from osc_data.video import Video
+            >>> video = Video(uri="input.mp4").load()
+            >>> video.save("output.mp4")
+            >>> video.save("output.avi", format="avi", codec="mpeg4")
         """
         if Path(path).exists():
             raise FileExistsError(f"File {path} already exists")
@@ -208,10 +227,12 @@ class Video(BaseDoc):
         if x < 0 or y < 0 or width <= 0 or height <= 0:
             raise ValueError("Crop dimensions must be positive")
         if x + width > video_width or y + height > video_height:
-            raise ValueError(f"Crop region exceeds video bounds ({video_width}x{video_height})")
+            raise ValueError(
+                f"Crop region exceeds video bounds ({video_width}x{video_height})"
+            )
 
         # Crop all frames using numpy slicing (N, H, W, C)
-        cropped_data = self.data[:, y:y+height, x:x+width, :]
+        cropped_data = self.data[:, y : y + height, x : x + width, :]
 
         return Video(
             uri=self.uri,
@@ -273,6 +294,37 @@ class Video(BaseDoc):
         if self.data is not None:
             return self.data.shape[1]
         return None
+
+    def get_best_size(self, ratio: tuple[int, int]) -> tuple[int, int]:
+        """根据指定宽高比，计算保持宽度不变时的最佳尺寸。
+
+        返回的高度会对齐到偶数（适配视频编码要求）。
+
+        Args:
+            ratio (tuple[int, int]): 目标宽高比，例如 (9, 16)。
+
+        Returns:
+            tuple[int, int]: 调整后的 (width, height)。
+
+        Raises:
+            ValueError: 视频数据未加载时抛出。
+
+        Examples:
+            >>> from osc_data.video import Video
+            >>> video = Video(uri="example.mp4").load()  # 假设视频宽度为 448
+            >>> video.get_best_size((9, 16))
+            (448, 796)
+            >>> video.get_best_size((16, 9))
+            (448, 252)
+        """
+        if self.data is None:
+            raise ValueError("Video data is not set")
+
+        w_ratio, h_ratio = ratio
+        new_height = round(self.width * h_ratio / w_ratio)
+        new_height += new_height % 2
+
+        return (self.width, new_height)
 
     @staticmethod
     def _adjust_audio_duration(
