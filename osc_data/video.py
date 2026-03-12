@@ -183,6 +183,79 @@ class Video(BaseDoc):
 
         return self
 
+    def crop(self, x: int, y: int, width: int, height: int) -> "Video":
+        """Crop video to specified region.
+
+        Args:
+            x (int): X coordinate of top-left corner.
+            y (int): Y coordinate of top-left corner.
+            width (int): Crop width.
+            height (int): Crop height.
+
+        Returns:
+            Video: New cropped Video object.
+
+        Raises:
+            ValueError: If video data is not set or crop region is invalid.
+        """
+        if self.data is None:
+            raise ValueError("Video data is not set")
+
+        video_height, video_width = self.data.shape[1:3]
+
+        if x < 0 or y < 0 or width <= 0 or height <= 0:
+            raise ValueError("Crop dimensions must be positive")
+        if x + width > video_width or y + height > video_height:
+            raise ValueError(f"Crop region exceeds video bounds ({video_width}x{video_height})")
+
+        # Crop all frames using numpy slicing (N, H, W, C)
+        cropped_data = self.data[:, y:y+height, x:x+width, :]
+
+        return Video(
+            uri=self.uri,
+            data=cropped_data,
+            fps=self.fps,
+            duration=self.duration,
+            has_audio=self.has_audio,
+        )
+
+    def resize(self, width: int, height: int) -> "Video":
+        """Resize video to target dimensions.
+
+        Uses bilinear interpolation for each frame.
+
+        Args:
+            width (int): Target width in pixels.
+            height (int): Target height in pixels.
+
+        Returns:
+            Video: New resized Video object.
+
+        Raises:
+            ValueError: If video data is not set.
+        """
+        if self.data is None:
+            raise ValueError("Video data is not set")
+
+        from PIL import Image as PILImage
+
+        resized_frames = []
+        for frame in self.data:
+            # Convert numpy array to PIL Image
+            pil_img = PILImage.fromarray(frame)
+            # Resize using bilinear interpolation
+            resized = pil_img.resize((width, height), PILImage.Resampling.BILINEAR)
+            # Convert back to numpy array
+            resized_frames.append(np.array(resized))
+
+        return Video(
+            uri=self.uri,
+            data=np.array(resized_frames, dtype=np.uint8),
+            fps=self.fps,
+            duration=self.duration,
+            has_audio=self.has_audio,
+        )
+
     @property
     def width(self) -> int | None:
         """Get video width in pixels."""

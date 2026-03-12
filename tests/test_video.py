@@ -152,17 +152,79 @@ class TestVideoAudio:
             Video.combine_video_audio(video, audio, "/tmp/test.mp4")
 
 
+class TestVideoCrop:
+    """Tests for video crop operations."""
+
+    def test_crop_center(self):
+        """Test cropping center region of video."""
+        video_path = ASSETS_DIR / "example.mp4"
+        video = Video(uri=str(video_path)).load()
+
+        # Crop 64x64 from center (original is 128x128)
+        x = (video.width - 64) // 2
+        y = (video.height - 64) // 2
+        cropped = video.crop(x, y, 64, 64)
+
+        assert cropped.width == 64
+        assert cropped.height == 64
+        assert cropped.data.shape == (video.data.shape[0], 64, 64, 3)
+        assert cropped.fps == video.fps
+
+    def test_crop_top_left(self):
+        """Test cropping top-left corner."""
+        video_path = ASSETS_DIR / "example.mp4"
+        video = Video(uri=str(video_path)).load()
+
+        cropped = video.crop(0, 0, 50, 50)
+
+        assert cropped.width == 50
+        assert cropped.height == 50
+
+    def test_crop_out_of_bounds_raises(self):
+        """Test that cropping out of bounds raises ValueError."""
+        video_path = ASSETS_DIR / "example.mp4"
+        video = Video(uri=str(video_path)).load()
+
+        with pytest.raises(ValueError, match="exceeds video bounds"):
+            video.crop(100, 100, 50, 50)  # Would exceed 128x128 bounds
+
+    def test_crop_without_data_raises(self):
+        """Test that cropping without data raises ValueError."""
+        video = Video()
+        with pytest.raises(ValueError, match="data is not set"):
+            video.crop(0, 0, 50, 50)
+
+
 class TestVideoResize:
     """Tests for video resize operations."""
 
-    def test_resize_down(self):
+    def test_resize_smaller(self):
         """Test resizing video to smaller dimensions."""
         video_path = ASSETS_DIR / "example.mp4"
         video = Video(uri=str(video_path)).load()
 
-        # Test split by key frames
-        segments = video.split_by_key_frames(min_split_duration_s=0)
-        assert isinstance(segments, list)
+        resized = video.resize(64, 64)
+
+        assert resized.width == 64
+        assert resized.height == 64
+        assert resized.data.shape == (video.data.shape[0], 64, 64, 3)
+        assert resized.fps == video.fps
+
+    def test_resize_larger(self):
+        """Test resizing video to larger dimensions."""
+        video_path = ASSETS_DIR / "example.mp4"
+        video = Video(uri=str(video_path)).load()
+
+        resized = video.resize(256, 256)
+
+        assert resized.width == 256
+        assert resized.height == 256
+
+    def test_resize_without_data_raises(self):
+        """Test that resizing without data raises ValueError."""
+        video = Video()
+        with pytest.raises(ValueError, match="data is not set"):
+            video.resize(64, 64)
 
 
 class TestVideoAudioDuration:
