@@ -7,21 +7,6 @@ from ._core import text as core_text
 from ._core import reorder as core_reorder
 
 
-KALDI_TAGGER = KaldiTextNormalizer(
-    str(Path(__file__).parent / "assets" / "text" / "tn" / "tagger.fst")
-)
-# 使用 Rust 实现的 Reorder 类
-REORDER = core_reorder.Reorder()
-VERALIZER = KaldiTextNormalizer(
-    str(Path(__file__).parent / "assets" / "text" / "tn" / "verbalizer.fst")
-)
-VERALIZER_REMOVE_ERHUA = KaldiTextNormalizer(
-    str(
-        Path(__file__).parent / "assets" / "text" / "tn" / "verbalizer_remove_erhua.fst"
-    )
-)
-
-
 class TextNormalizer(BaseModel):
     model_config: ConfigDict = ConfigDict(arbitrary_types_allowed=True)
 
@@ -34,13 +19,33 @@ class TextNormalizer(BaseModel):
 
     @model_validator(mode="after")
     def setup_model(self) -> "TextNormalizer":
-        if self.remove_erhua:
-            self.tagger = KALDI_TAGGER
-            self.verbalizer = VERALIZER_REMOVE_ERHUA
-        else:
-            self.tagger = KALDI_TAGGER
-            self.verbalizer = VERALIZER
-        self.reorder = REORDER
+        if self.tagger is None:
+            self.tagger = KaldiTextNormalizer(
+                str(Path(__file__).parent / "assets" / "text" / "tn" / "tagger.fst")
+            )
+        if self.verbalizer is None:
+            if self.remove_erhua:
+                self.verbalizer = KaldiTextNormalizer(
+                    str(
+                        Path(__file__).parent
+                        / "assets"
+                        / "text"
+                        / "tn"
+                        / "verbalizer_remove_erhua.fst"
+                    )
+                )
+            else:
+                self.verbalizer = KaldiTextNormalizer(
+                    str(
+                        Path(__file__).parent
+                        / "assets"
+                        / "text"
+                        / "tn"
+                        / "verbalizer.fst"
+                    )
+                )
+        if self.reorder is None:
+            self.reorder = core_reorder.Reorder()
         return self
 
     def normalize(self, text: str) -> str:

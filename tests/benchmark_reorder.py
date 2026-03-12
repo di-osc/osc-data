@@ -132,6 +132,7 @@ class TokenParser:
 
 # ============ Benchmark Tests ============
 
+
 def benchmark():
     """Run performance benchmark comparing Python vs Rust implementation."""
 
@@ -165,8 +166,10 @@ def benchmark():
     python_impl = TokenParser()
 
     import sys
+
     sys.path.insert(0, str(Path(__file__).parent.parent))
     from osc_data._core import reorder as core_reorder
+
     rust_impl = core_reorder.Reorder()
 
     results = []
@@ -183,30 +186,32 @@ def benchmark():
 
         # Benchmark Python implementation
         python_time = timeit.timeit(
-            lambda: python_impl.reorder(test_input),
-            number=iterations
+            lambda: python_impl.reorder(test_input), number=iterations
         )
 
         # Benchmark Rust implementation
         rust_time = timeit.timeit(
-            lambda: rust_impl.reorder(test_input),
-            number=iterations
+            lambda: rust_impl.reorder(test_input), number=iterations
         )
 
         # Calculate speedup
-        speedup = python_time / rust_time if rust_time > 0 else float('inf')
+        speedup = python_time / rust_time if rust_time > 0 else float("inf")
 
         # Store results
-        results.append({
-            'test': test_name,
-            'python_time': python_time,
-            'rust_time': rust_time,
-            'speedup': speedup
-        })
+        results.append(
+            {
+                "test": test_name,
+                "python_time": python_time,
+                "rust_time": rust_time,
+                "speedup": speedup,
+            }
+        )
 
         # Print results
-        print(f"  Python: {python_time:.4f}s ({python_time/iterations*1e6:.2f} µs/op)")
-        print(f"  Rust:   {rust_time:.4f}s ({rust_time/iterations*1e6:.2f} µs/op)")
+        print(
+            f"  Python: {python_time:.4f}s ({python_time / iterations * 1e6:.2f} µs/op)"
+        )
+        print(f"  Rust:   {rust_time:.4f}s ({rust_time / iterations * 1e6:.2f} µs/op)")
         print(f"  Speedup: {speedup:.2f}x")
 
     # Summary
@@ -214,13 +219,13 @@ def benchmark():
     print("Summary")
     print("=" * 70)
 
-    total_python = sum(r['python_time'] for r in results)
-    total_rust = sum(r['rust_time'] for r in results)
-    avg_speedup = sum(r['speedup'] for r in results) / len(results)
+    total_python = sum(r["python_time"] for r in results)
+    total_rust = sum(r["rust_time"] for r in results)
+    avg_speedup = sum(r["speedup"] for r in results) / len(results)
 
     print(f"Total Python time: {total_python:.4f}s")
     print(f"Total Rust time:   {total_rust:.4f}s")
-    print(f"Overall speedup:   {total_python/total_rust:.2f}x")
+    print(f"Overall speedup:   {total_python / total_rust:.2f}x")
     print(f"Average speedup:   {avg_speedup:.2f}x")
 
     # Verify correctness

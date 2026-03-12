@@ -412,7 +412,7 @@ class Video(BaseDoc):
                 print(
                     f"Video: {self.width}x{self.height}, {self.fps}fps, {self.duration}s"
                 )
-                print(f"Tip: Save video to file to display with embedded player")
+                print("Tip: Save video to file to display with embedded player")
         except ImportError:
             print(f"Video: {self.width}x{self.height}, {self.fps}fps, {self.duration}s")
 

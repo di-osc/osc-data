@@ -118,9 +118,7 @@ class TestReorder:
         reorder = core_reorder.Reorder()
 
         # Set custom order
-        custom_orders = {
-            "custom_type": ["field_b", "field_a"]
-        }
+        custom_orders = {"custom_type": ["field_b", "field_a"]}
         reorder.orders = custom_orders
 
         # Verify custom order is used
@@ -143,8 +141,8 @@ class TestReorder:
 
         # With preserve_order, original order should be maintained
         # currency comes before value in input
-        currency_pos = result.find('currency')
-        value_pos = result.find('value')
+        currency_pos = result.find("currency")
+        value_pos = result.find("value")
         assert currency_pos < value_pos, "preserve_order should maintain input order"
 
     def test_escaped_quotes_in_value(self):
@@ -179,12 +177,12 @@ class TestReorderIntegration:
     """Integration tests with TextNormalizer if available."""
 
     def test_reorder_from_text_module(self):
-        """Test that REORDER from text module works."""
-        from osc_data.text import REORDER
+        """Test that Reorder works through TextNormalizer."""
+        from osc_data._core import reorder as core_reorder
 
-        # This should be the Rust implementation
+        reorder = core_reorder.Reorder()
         input_text = 'money { currency: "USD" value: "100" }'
-        result = REORDER.reorder(input_text)
+        result = reorder.reorder(input_text)
         expected = 'money { value: "100" currency: "USD" }'
         assert result == expected
 
