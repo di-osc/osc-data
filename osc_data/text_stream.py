@@ -40,13 +40,53 @@ class TextStreamSentencizer:
         )
 
     def push(self, text: str) -> List[str]:
+        """Push text into the stream and get completed sentences.
+
+        This method processes incoming text character by character (or in chunks)
+        and returns any completed sentences detected.
+
+        Args:
+            text (str): Text to push into the stream.
+
+        Returns:
+            List[str]: List of completed sentences detected from the stream.
+
+        Example:
+            >>> sentencizer = TextStreamSentencizer()
+            >>> sentences = sentencizer.push("Hello world. This is a test.")
+            >>> print(sentences)
+            ['Hello world.']
+        """
         return self._sentencizer.push(text)
 
     def flush(self) -> List[str]:
+        """Flush the buffer and return remaining content as sentences.
+
+        This method should be called when the stream ends to get any
+        remaining text that hasn't been returned as a complete sentence.
+
+        Returns:
+            List[str]: List of remaining sentences from the buffer.
+
+        Example:
+            >>> sentencizer = TextStreamSentencizer()
+            >>> sentencizer.push("Hello world")
+            >>> remaining = sentencizer.flush()
+            >>> print(remaining)
+            ['Hello world']
+        """
         return self._sentencizer.flush()
 
 
 def check_all_chars(text: List[str]) -> bool:
+    """Check if all elements in the list are single characters.
+
+    Args:
+        text (List[str]): List of strings to check.
+
+    Returns:
+        bool: True if all elements are single-character strings, False otherwise.
+    """
     for char in text:
         if len(char) != 1 or not isinstance(char, str):
             return False

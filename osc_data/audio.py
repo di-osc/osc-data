@@ -28,7 +28,20 @@ class Audio(BaseDoc):
     data: NdArray = Field(None, description="Data of the audio file.")
 
     def load(self, sample_rate: int | None = None, mono: bool | None = None) -> "Audio":
-        """Load the audio file from the URL."""
+        """Load the audio file from local path or URL.
+
+        Args:
+            sample_rate (int | None, optional): Target sample rate for resampling.
+                If None, uses the native sample rate. Defaults to None.
+            mono (bool | None, optional): If True, convert to mono channel.
+                If None, keep original channels. Defaults to None.
+
+        Returns:
+            Audio: The loaded audio object with data populated.
+
+        Raises:
+            ValueError: If loading fails.
+        """
         try:
             if Path(self.uri).exists():
                 data, sample_rate = librosa.load(self.uri, sr=sample_rate, mono=mono)
@@ -44,12 +57,24 @@ class Audio(BaseDoc):
         return self
 
     def load_example(self) -> "Audio":
+        """Load the built-in example audio file.
+
+        Returns:
+            Audio: The loaded example audio.
+        """
         example_path = Path(__file__).parent / "assets" / "audio" / "example.wav"
-        self.uri = example_path
+        self.uri = str(example_path)
         return self.load()
 
     def display(self):
-        """Display the audio file."""
+        """Display the audio file in Jupyter Notebook.
+
+        Returns:
+            IPython.display.Audio: Audio player widget.
+
+        Note:
+            Requires IPython. In non-Jupyter environments, this will fail.
+        """
         from IPython.display import Audio as IPAudio
 
         return IPAudio(

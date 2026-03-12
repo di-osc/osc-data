@@ -4,6 +4,18 @@ use numpy::{PyArray2, PyArray3, PyReadonlyArray2, PyReadonlyArray3, PyUntypedArr
 use pyo3::prelude::*;
 use std::ops::Add;
 
+/// Low frame rate processing for audio frames.
+///
+/// This function processes audio frames by repeating and concatenating frames
+/// to achieve a lower effective frame rate.
+///
+/// Args:
+///     frames: Input array of shape (batch_size, n_frames, n_hidden)
+///     m: Number of times to repeat each frame segment
+///     n: Downsampling factor for frames
+///
+/// Returns:
+///     Processed array of shape (batch_size, n_output_frames, n_output_hidden)
 #[pyfunction]
 pub fn low_frame_rate<'py>(
     py: Python<'py>,
@@ -88,6 +100,16 @@ pub fn low_frame_rate<'py>(
     Ok(PyArray3::from_owned_array(py, output_frames))
 }
 
+/// Compute decibel values from audio frames.
+///
+/// Calculates the power in decibels for each audio frame using the formula:
+///     dB = 10 * log10(sum(frame^2) + 1e-6)
+///
+/// Args:
+///     frames: Input array of audio frames with shape (frame_len, features)
+///
+/// Returns:
+///     Decibel values with shape (frame_len, 1)
 #[pyfunction]
 pub fn compute_decibel<'py>(
     python: Python<'py>,
