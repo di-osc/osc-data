@@ -178,3 +178,4 @@ target/
 Cargo.lock
 uv.lock
 .DS_Store
+assets
