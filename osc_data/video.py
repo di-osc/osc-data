@@ -243,6 +243,45 @@ class Video(BaseDoc):
             prompt=self.prompt,
         )
 
+    def center_crop_by_ratio(self, ratio: tuple[int, int]) -> "Video":
+        """按目标宽高比从中心裁剪视频，不做缩放。
+
+        宽于目标比例时裁剪两侧，窄于目标比例时裁剪上下。
+        等价于 ffmpeg 的 crop 滤镜按比例居中裁剪。
+
+        Args:
+            ratio (tuple[int, int]): 目标宽高比，例如 (9, 16)。
+
+        Returns:
+            Video: 新的裁剪后 Video 对象。
+
+        Raises:
+            ValueError: 视频数据未加载时抛出。
+
+        Examples:
+            >>> from osc_data.video import Video
+            >>> video = Video(uri="video.mp4").load()  # 假设 1920x1080
+            >>> cropped = video.center_crop_by_ratio((9, 16))
+            >>> cropped.width, cropped.height  # 608x1080
+        """
+        if self.data is None:
+            raise ValueError("Video data is not set")
+
+        w_ratio, h_ratio = ratio
+        target_ratio = w_ratio / h_ratio
+        current_ratio = self.width / self.height
+
+        if current_ratio > target_ratio:
+            new_width = round(self.height * w_ratio / h_ratio)
+            new_width -= new_width % 2
+            x = (self.width - new_width) // 2
+            return self.crop(x, 0, new_width, self.height)
+        else:
+            new_height = round(self.width * h_ratio / w_ratio)
+            new_height -= new_height % 2
+            y = (self.height - new_height) // 2
+            return self.crop(0, y, self.width, new_height)
+
     def resize(self, width: int, height: int) -> "Video":
         """Resize video to target dimensions.
 

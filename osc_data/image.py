@@ -1,6 +1,7 @@
 from __future__ import annotations
 import math
 from pathlib import Path
+from typing import ClassVar
 
 import requests
 
@@ -17,6 +18,7 @@ from osc_data._core import (
     decode_image,
     get_image_info,
     batch_resize,
+    normalize_image,
 )
 
 
@@ -257,6 +259,53 @@ class Image(BaseDoc):
             height=height,
             color_mode=self.color_mode,
         )
+
+    DEFAULT_MEAN: ClassVar[list[float]] = [0.5, 0.5, 0.5]
+    DEFAULT_STD: ClassVar[list[float]] = [0.5, 0.5, 0.5]
+
+    def normalize(
+        self,
+        mean: list[float] | None = None,
+        std: list[float] | None = None,
+    ) -> "Image":
+        """将图像从 uint8 [0, 255] 标准化为 float32，按通道减均值除标准差。
+
+        默认公式: (pixel / 255.0 - 0.5) / 0.5，即 (pixel / 255.0 - 0.5) * 2，
+        输出范围 [-1, 1]。
+
+        Args:
+            mean (list[float], optional): 每通道均值，默认 [0.5, 0.5, 0.5]。
+            std (list[float], optional): 每通道标准差，默认 [0.5, 0.5, 0.5]。
+
+        Returns:
+            Image: 返回自身，data 被替换为 float32。
+
+        Raises:
+            ValueError: 图像数据未加载，或 mean/std 长度与通道数不匹配。
+
+        Examples:
+            >>> from osc_data.image import Image
+            >>> img = Image(uri="photo.jpg").load() # [0, 255]
+            >>> img.data.dtype
+            dtype('uint8')
+            >>> img.normalize()  # [-1, 1]
+            >>> img.data.dtype
+            dtype('float32')
+            >>> # ImageNet 标准化
+            >>> img.normalize(
+            ...     mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+            ... )
+        """
+        if self.data is None:
+            raise ValueError("Image data is not set")
+
+        if mean is None:
+            mean = self.DEFAULT_MEAN
+        if std is None:
+            std = self.DEFAULT_STD
+
+        self.data = normalize_image(self.data, mean, std)
+        return self
 
     @staticmethod
     def from_bytes(data: bytes) -> "Image":
