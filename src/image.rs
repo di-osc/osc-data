@@ -469,6 +469,69 @@ fn batch_resize<'py>(
     Ok(out_array)
 }
 
+/// Normalize image from uint8 [0, 255] to float32, with optional mean/std per channel.
+///
+/// Args:
+///     data: numpy array of shape (H, W, C) uint8
+///     mean: per-channel mean, e.g. [0.485, 0.456, 0.406] for ImageNet RGB
+///     std: per-channel std, e.g. [0.229, 0.224, 0.225] for ImageNet RGB
+///
+/// Returns:
+///     numpy array of shape (H, W, C) float32, computed as (pixel/255.0 - mean) / std
+#[pyfunction]
+fn normalize_image<'py>(
+    py: Python<'py>,
+    data: PyReadonlyArray3<u8>,
+    mean: Vec<f32>,
+    std: Vec<f32>,
+) -> PyResult<Bound<'py, numpy::PyArray3<f32>>> {
+    let arr = data.as_array();
+    let shape = arr.shape();
+    let height = shape[0];
+    let width = shape[1];
+    let channels = shape[2];
+
+    if mean.len() != channels || std.len() != channels {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+            "mean/std length ({}/{}) must match channel count ({})",
+            mean.len(),
+            std.len(),
+            channels
+        )));
+    }
+
+    for (i, &s) in std.iter().enumerate() {
+        if s == 0.0 {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "std[{}] is zero, division by zero",
+                i
+            )));
+        }
+    }
+
+    let slice = arr.as_standard_layout();
+    let bytes = slice.as_slice().unwrap();
+    let total = height * width * channels;
+    let mut output = Vec::with_capacity(total);
+
+    for pixel in bytes.chunks_exact(channels) {
+        for c in 0..channels {
+            output.push((pixel[c] as f32 / 255.0 - mean[c]) / std[c]);
+        }
+    }
+
+    let out_array = numpy::PyArray3::from_owned_array(
+        py,
+        ndarray::Array::from_shape_vec([height, width, channels], output).map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Failed to create array: {}",
+                e
+            ))
+        })?,
+    );
+    Ok(out_array)
+}
+
 pub fn register_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(convert_to_rgb, m)?)?;
     m.add_function(wrap_pyfunction!(resize_image, m)?)?;
@@ -477,5 +540,6 @@ pub fn register_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(decode_image, m)?)?;
     m.add_function(wrap_pyfunction!(get_image_info, m)?)?;
     m.add_function(wrap_pyfunction!(batch_resize, m)?)?;
+    m.add_function(wrap_pyfunction!(normalize_image, m)?)?;
     Ok(())
 }
