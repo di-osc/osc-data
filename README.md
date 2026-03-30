@@ -14,7 +14,7 @@
 - **文本处理**：文本正则化（TN）、去 emoji、全角转半角、流式句子分割，支持中英文混合文本
 - **图像处理**：加载、保存、格式转换、缩放、裁剪，支持 PNG/JPEG/WebP/BMP/GIF/TIFF
 - **音频处理**：音频加载、特征提取（分贝计算等）
-- **视频处理**：视频加载、帧提取、关键帧分割、音频提取与合并、保存
+- **视频处理**：视频加载、帧提取、关键帧分割、音频提取与合并、保存；支持 MP4/MOV 等 FFmpeg 可解封装格式
 - **音视频同步**：音频时长自动调整（循环/静音填充）、音频截断警告
 - **高性能**：核心算法使用 Rust + PyO3 实现，Python 端使用 DocArray 类型系统
 
@@ -32,17 +32,17 @@
 pip install osc-data --upgrade
 
 # 从 Git 仓库直接安装
-pip install git+https://github.com/username/osc-data.git
+pip install git+https://github.com/di-osc/osc-data.git
 
-# 安装指定版本
-pip install osc-data==0.3.0
+# 安装指定版本（示例）
+pip install "osc-data>=0.3.1"
 ```
 
 ### 从源码安装
 
 ```bash
 # 克隆仓库
-git clone <repository-url>
+git clone https://github.com/di-osc/osc-data.git
 cd osc-data
 
 # 使用 uv 安装 (推荐)
@@ -84,9 +84,9 @@ cropped = img.crop(100, 100, 200, 200)
 img.save("output.png")
 img.save("output.jpg", file_format="jpeg", quality=95)
 
-# 批量处理
-images = [img1, img2, img3]
-resized_batch = Image.batch_resize_images(images, 256, 256)
+# 批量处理（传入已加载的 Image 实例列表）
+# images = [img_a, img_b, img_c]
+# resized_batch = Image.batch_resize_images(images, 256, 256)
 ```
 
 ### 文本处理
@@ -152,6 +152,8 @@ segments = video.split_by_key_frames(min_split_duration_s=5)
 audio = video.extract_audio()
 
 # 合并音频（自动调整音频时长匹配视频）
+# 指定 output_path 时会把已含音视频的完整文件复制到目标路径（保留音轨）；
+# 勿用仅含帧数据的 merged.save() 代替导出，否则输出的文件没有音轨。
 new_audio = Audio(uri="./music.mp3").load()
 merged = video.merge_audio(new_audio, "output.mp4", audio_mode="loop")
 # audio_mode: "loop" 循环填充, "silence" 静音填充
@@ -160,7 +162,7 @@ merged = video.merge_audio(new_audio, "output.mp4", audio_mode="loop")
 no_audio = video.remove_audio("silent.mp4")
 
 # 静态方法合并视频和音频
-combined = Video.combine_video_audio(video, audio, "final.mp4")
+combined = Video.combine_video_audio(video, new_audio, "final.mp4")
 
 # 在 Jupyter 中显示视频
 video.display()
@@ -169,7 +171,7 @@ video.display()
 best_w, best_h = video.get_best_size((9, 16))
 print(f"9:16 最佳尺寸: {best_w}x{best_h}")
 
-# 保存视频
+# 保存视频（仅编码内存中的视频帧，不含音轨；目标路径已存在时会覆盖）
 video.save("output.mp4", format="mp4", codec="h264")
 ```
 
@@ -181,11 +183,12 @@ from osc_data.audio import Audio
 # 加载音频
 audio = Audio(uri="./audio.wav").load()
 
-print(f"采样率: {audio.sampling_rate}, 时长: {audio.duration}s")
+print(f"采样率: {audio.sample_rate} Hz, 时长: {audio.duration_s:.2f} s")
 
 # 计算分贝
 from osc_data._core import compute_decibel
-db = compute_decibel(audio.data, audio.sampling_rate)
+
+db = compute_decibel(audio.data, audio.sample_rate)
 ```
 
 ## API 文档
@@ -233,6 +236,17 @@ db = compute_decibel(audio.data, audio.sampling_rate)
 | `flush()` | 清空缓冲区，返回剩余内容 |
 | `reset()` | 重置状态 |
 
+### Audio 类
+
+| 属性/方法 | 说明 |
+|-----------|------|
+| `uri` | 音频路径或 URL |
+| `sample_rate` | 采样率（Hz） |
+| `data` | 波形数组（librosa load 结果） |
+| `load(sample_rate, mono)` | 加载；可指定目标采样率与是否单声道 |
+| `duration_s` / `duration_ms` | 时长（秒 / 毫秒） |
+| `save(path, format)` | 经 PyAV 编码保存；支持 MP3、WAV、FLAC、OGG 等 |
+
 ### Video 类
 
 | 属性/方法 | 说明 |
@@ -242,13 +256,13 @@ db = compute_decibel(audio.data, audio.sampling_rate)
 | `fps` | 帧率 |
 | `duration` | 时长（秒） |
 | `has_audio` | 是否有音轨 |
-| `load()` | 加载视频 |
+| `load()` | 从本地路径或 URL 加载视频（仅解码视频帧至内存） |
 | `load_example()` | 加载内置示例视频 |
-| `save(path, format, codec)` | 保存视频 |
+| `save(path, format, codec)` | 保存视频（仅视频帧；路径存在则覆盖） |
 | `display()` | 显示视频 (Jupyter) |
 | `split_by_key_frames(min_split_duration_s)` | 按关键帧分割 |
 | `extract_audio()` | 提取音频 |
-| `merge_audio(audio, output_path, audio_mode)` | 合并音频（替换原音频） |
+| `merge_audio(audio, output_path, audio_mode)` | 合并音频；写盘时复制完整封装以保留音轨 |
 | `get_best_size(ratio)` | 根据宽高比计算最佳尺寸 |
 | `remove_audio(output_path)` | 移除音频 |
 | `combine_video_audio(video, audio, output_path)` | 静态方法：合并视频和音频 |
@@ -279,7 +293,8 @@ osc-data/
 │   ├── image.rs        # 图像处理核心
 │   ├── audio.rs        # 音频处理核心
 │   ├── text.rs         # 文本处理核心
-│   └── text_stream.rs  # 流式文本分割核心
+│   ├── text_stream.rs  # 流式文本分割核心
+│   └── reorder.rs      # 重排序等辅助逻辑
 ├── tests/              # 测试文件
 │   ├── test_image.py
 │   ├── test_sentencizer.py
@@ -323,6 +338,7 @@ cargo fmt
 ## 依赖
 
 ### Python 依赖
+- `kaldifst` >= 1.7.14: FST / 文本相关依赖
 - `pydantic` >= 2.11.7: 数据验证
 - `docarray`: 多模态数据类型系统
 - `numpy`: 数组操作
@@ -344,4 +360,4 @@ cargo fmt
 
 ## License
 
-[添加许可证信息]
+本仓库当前 **未附带 `LICENSE` 文件**；使用前请自行确认授权范围或与维护者联系。若在 PyPI 发布页有单独声明，以发布页为准。
