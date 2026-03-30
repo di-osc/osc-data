@@ -35,7 +35,7 @@ pip install osc-data --upgrade
 pip install git+https://github.com/username/osc-data.git
 
 # 安装指定版本
-pip install osc-data==0.2.9
+pip install osc-data==0.3.0
 ```
 
 ### 从源码安装
