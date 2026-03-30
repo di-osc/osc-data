@@ -2,6 +2,8 @@
 
 from pathlib import Path
 import tempfile
+
+import av
 import numpy as np
 import pytest
 
@@ -71,14 +73,18 @@ class TestVideoSave:
             assert saved_video.width == video.width
             assert saved_video.height == video.height
 
-    def test_save_to_existing_path_raises(self):
-        """Test that saving to existing path raises FileExistsError."""
+    def test_save_overwrites_existing_file(self):
+        """目标路径已存在时覆盖写入，不报错。"""
         video_path = ASSETS_DIR / "example.mp4"
         video = Video(uri=str(video_path)).load()
 
-        with tempfile.NamedTemporaryFile(suffix=".mp4") as tmp:
-            with pytest.raises(FileExistsError):
-                video.save(tmp.name)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out = Path(tmpdir) / "out.mp4"
+            out.write_bytes(b"placeholder")
+            video.save(str(out))
+            saved = Video(uri=str(out)).load()
+            assert saved.fps == video.fps
+            assert saved.width == video.width
 
     def test_save_without_data_raises(self):
         """Test that saving without data raises ValueError."""
@@ -294,6 +300,24 @@ class TestVideoAudioDuration:
             assert output_path.exists()
             assert merged.has_audio is True
             assert merged.fps == video.fps
+
+    def test_merge_audio_saved_file_contains_audio_stream(self):
+        """merge_audio 写入的路径必须是带音轨的容器，不能仅为视频重编码。"""
+        video_path = ASSETS_DIR / "example.mp4"
+        video = Video(uri=str(video_path)).load()
+
+        audio = Audio()
+        audio.sample_rate = 22050
+        duration_samples = int(audio.sample_rate * float(video.duration))
+        audio.data = np.random.randn(duration_samples).astype(np.float32) * 0.1
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir) / "merged_with_audio.mp4"
+            video.merge_audio(audio, str(output_path), audio_mode="loop")
+
+            with av.open(str(output_path)) as container:
+                audio_streams = [s for s in container.streams if s.type == "audio"]
+                assert len(audio_streams) >= 1
 
 
 if __name__ == "__main__":

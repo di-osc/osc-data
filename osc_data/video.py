@@ -2,6 +2,7 @@ from __future__ import annotations
 from pathlib import Path
 from io import BytesIO
 from fractions import Fraction
+import shutil
 import tempfile
 
 import av
@@ -147,7 +148,7 @@ class Video(BaseDoc):
         像素格式固定为 yuv420p，适配主流播放器。
 
         Args:
-            path (str): 保存路径，文件已存在时抛出 FileExistsError。
+            path (str): 保存路径；若文件已存在则覆盖写入。
             format (str): 容器格式，默认 "mp4"。常用值: "mp4", "avi", "mkv", "mov"。
             codec (str): 视频编码器，默认 "h264"。常用值: "h264", "hevc", "mpeg4", "vp9"。
 
@@ -155,7 +156,6 @@ class Video(BaseDoc):
             Video: 返回自身，支持链式调用。
 
         Raises:
-            FileExistsError: 目标文件已存在。
             ValueError: 视频数据或 fps 未设置。
             RuntimeError: 编码或写入失败。
 
@@ -165,8 +165,6 @@ class Video(BaseDoc):
             >>> video.save("output.mp4")
             >>> video.save("output.avi", format="avi", codec="mpeg4")
         """
-        if Path(path).exists():
-            raise FileExistsError(f"File {path} already exists")
         if self.data is None:
             raise ValueError("Video data is not set")
         if self.fps is None:
@@ -521,8 +519,9 @@ class Video(BaseDoc):
 
         Args:
             audio (Audio): Audio object to merge with the video.
-            output_path (str, optional): Output path for the merged video.
-                If None, returns a new Video object without saving to file.
+            output_path (str, optional): 合并后的保存路径。指定时会把已含音视频的
+                临时文件复制到该路径（保留音轨）；不会调用 :meth:`save`，因 ``save``
+                仅从帧数据重编码视频、不含音频。
             audio_mode (str): How to handle audio duration mismatch.
                 - "loop": Loop audio to match video duration (default).
                 - "silence": Pad with silence if audio is shorter.
@@ -608,9 +607,16 @@ class Video(BaseDoc):
             merged_video = Video(uri=tmp_path).load()
             merged_video.has_audio = True
 
-            # If output_path specified, save to that location
+            # 临时文件已是完整音视频；save() 只编码 self.data 中的帧，不会写入音轨，
+            # 因此必须用复制保留音轨，不能调用 merged_video.save(output_path)。
             if output_path:
-                merged_video.save(output_path)
+                Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(tmp_path, output_path)
+                merged_video.uri = str(Path(output_path).resolve())
+                try:
+                    Path(tmp_path).unlink(missing_ok=True)
+                except OSError:
+                    pass
 
             return merged_video
 
@@ -692,7 +698,7 @@ class Video(BaseDoc):
         Args:
             video (Video): Video object with video data.
             audio (Audio): Audio object to merge.
-            output_path (str): Output path for the combined video.
+            output_path (str): 合并输出路径；文件已存在则覆盖。
             video_codec (str): Video codec to use. Default: "h264".
             audio_codec (str): Audio codec to use. Default: "aac".
             audio_mode (str): How to handle audio duration mismatch.
@@ -712,9 +718,6 @@ class Video(BaseDoc):
             raise ValueError("Audio data is not set")
         if video.fps is None:
             raise ValueError("Video fps is not set")
-
-        if Path(output_path).exists():
-            raise FileExistsError(f"File {output_path} already exists")
 
         try:
             # Create output container
