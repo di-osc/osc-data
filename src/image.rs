@@ -1,4 +1,4 @@
-use image::{DynamicImage, ImageBuffer, Rgb, Rgba, Luma, ImageFormat};
+use image::{DynamicImage, ImageBuffer, ImageFormat, Luma, Rgb, Rgba};
 use numpy::{PyArray3, PyArray4, PyReadonlyArray3, PyReadonlyArray4};
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
@@ -20,7 +20,7 @@ fn convert_to_rgb<'py>(
     let shape = arr.shape();
     if shape.len() != 3 {
         return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-            "Input array must be 3D (H, W, C)"
+            "Input array must be 3D (H, W, C)",
         ));
     }
     let height = shape[0];
@@ -31,7 +31,7 @@ fn convert_to_rgb<'py>(
         "RGB" => {
             if channels != 3 {
                 return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                    "RGB format requires 3 channels"
+                    "RGB format requires 3 channels",
                 ));
             }
             arr.as_standard_layout().as_slice().unwrap().to_vec()
@@ -39,7 +39,7 @@ fn convert_to_rgb<'py>(
         "RGBA" => {
             if channels != 4 {
                 return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                    "RGBA format requires 4 channels"
+                    "RGBA format requires 4 channels",
                 ));
             }
             let slice = arr.as_standard_layout();
@@ -55,7 +55,7 @@ fn convert_to_rgb<'py>(
         "L" | "GRAYSCALE" => {
             if channels != 1 {
                 return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                    "Grayscale format requires 1 channel"
+                    "Grayscale format requires 1 channel",
                 ));
             }
             let slice = arr.as_standard_layout();
@@ -69,18 +69,21 @@ fn convert_to_rgb<'py>(
             rgb
         }
         _ => {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                format!("Unsupported format: {}", from_format)
-            ));
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Unsupported format: {}",
+                from_format
+            )));
         }
     };
 
     let out_array = PyArray3::from_owned_array(
         py,
-        ndarray::Array::from_shape_vec([height, width, 3], rgb_data)
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                format!("Failed to create array: {}", e)
-            ))?
+        ndarray::Array::from_shape_vec([height, width, 3], rgb_data).map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Failed to create array: {}",
+                e
+            ))
+        })?,
     );
     Ok(out_array)
 }
@@ -103,52 +106,65 @@ fn resize_image<'py>(
     let shape = arr.shape();
     if shape.len() != 3 {
         return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-            "Input array must be 3D (H, W, C)"
+            "Input array must be 3D (H, W, C)",
         ));
     }
     let height = shape[0] as u32;
     let width = shape[1] as u32;
     let channels = shape[2];
 
-    let img = match channels {
-        3 => {
-            let slice = arr.as_standard_layout();
-            let bytes = slice.as_slice().unwrap();
-            DynamicImage::ImageRgb8(
-                ImageBuffer::<Rgb<u8>, _>::from_raw(width, height, bytes.to_vec())
-                    .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                        "Failed to create RGB image buffer"
-                    ))?
-            )
-        }
-        4 => {
-            let slice = arr.as_standard_layout();
-            let bytes = slice.as_slice().unwrap();
-            DynamicImage::ImageRgba8(
-                ImageBuffer::<Rgba<u8>, _>::from_raw(width, height, bytes.to_vec())
-                    .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                        "Failed to create RGBA image buffer"
-                    ))?
-            )
-        }
-        1 => {
-            let slice = arr.as_standard_layout();
-            let bytes = slice.as_slice().unwrap();
-            DynamicImage::ImageLuma8(
-                ImageBuffer::<Luma<u8>, _>::from_raw(width, height, bytes.to_vec())
-                    .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                        "Failed to create grayscale image buffer"
-                    ))?
-            )
-        }
-        _ => {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                format!("Unsupported channel count: {}", channels)
-            ));
-        }
-    };
+    let img =
+        match channels {
+            3 => {
+                let slice = arr.as_standard_layout();
+                let bytes = slice.as_slice().unwrap();
+                DynamicImage::ImageRgb8(
+                    ImageBuffer::<Rgb<u8>, _>::from_raw(width, height, bytes.to_vec()).ok_or_else(
+                        || {
+                            PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                                "Failed to create RGB image buffer",
+                            )
+                        },
+                    )?,
+                )
+            }
+            4 => {
+                let slice = arr.as_standard_layout();
+                let bytes = slice.as_slice().unwrap();
+                DynamicImage::ImageRgba8(
+                    ImageBuffer::<Rgba<u8>, _>::from_raw(width, height, bytes.to_vec())
+                        .ok_or_else(|| {
+                            PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                                "Failed to create RGBA image buffer",
+                            )
+                        })?,
+                )
+            }
+            1 => {
+                let slice = arr.as_standard_layout();
+                let bytes = slice.as_slice().unwrap();
+                DynamicImage::ImageLuma8(
+                    ImageBuffer::<Luma<u8>, _>::from_raw(width, height, bytes.to_vec())
+                        .ok_or_else(|| {
+                            PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                                "Failed to create grayscale image buffer",
+                            )
+                        })?,
+                )
+            }
+            _ => {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                    "Unsupported channel count: {}",
+                    channels
+                )));
+            }
+        };
 
-    let resized = img.resize(target_width, target_height, image::imageops::FilterType::Lanczos3);
+    let resized = img.resize(
+        target_width,
+        target_height,
+        image::imageops::FilterType::Lanczos3,
+    );
 
     let (out_w, out_h) = (resized.width() as usize, resized.height() as usize);
     let out_vec = match resized {
@@ -169,10 +185,12 @@ fn resize_image<'py>(
     };
     let out_array = PyArray3::from_owned_array(
         _py,
-        ndarray::Array::from_shape_vec([out_h, out_w, final_channels], out_vec)
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                format!("Failed to create array: {}", e)
-            ))?
+        ndarray::Array::from_shape_vec([out_h, out_w, final_channels], out_vec).map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Failed to create array: {}",
+                e
+            ))
+        })?,
     );
     Ok(out_array)
 }
@@ -199,7 +217,7 @@ fn crop_image<'py>(
     let shape = arr.shape();
     if shape.len() != 3 {
         return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-            "Input array must be 3D (H, W, C)"
+            "Input array must be 3D (H, W, C)",
         ));
     }
     let img_height = shape[0] as u32;
@@ -208,7 +226,7 @@ fn crop_image<'py>(
 
     if x + width > img_width || y + height > img_height {
         return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-            "Crop region exceeds image bounds"
+            "Crop region exceeds image bounds",
         ));
     }
 
@@ -225,9 +243,12 @@ fn crop_image<'py>(
     let out_array = PyArray3::from_owned_array(
         _py,
         ndarray::Array::from_shape_vec([height as usize, width as usize, channels], cropped)
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                format!("Failed to create array: {}", e)
-            ))?
+            .map_err(|e| {
+                PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                    "Failed to create array: {}",
+                    e
+                ))
+            })?,
     );
     Ok(out_array)
 }
@@ -250,7 +271,7 @@ fn encode_image<'py>(
     let shape = arr.shape();
     if shape.len() != 3 {
         return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-            "Input array must be 3D (H, W, C)"
+            "Input array must be 3D (H, W, C)",
         ));
     }
     let height = shape[0] as u32;
@@ -262,27 +283,37 @@ fn encode_image<'py>(
 
     let img: DynamicImage = match channels {
         3 => DynamicImage::ImageRgb8(
-            ImageBuffer::<Rgb<u8>, _>::from_raw(width, height, bytes.to_vec())
-                .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                    "Failed to create RGB image buffer"
-                ))?
+            ImageBuffer::<Rgb<u8>, _>::from_raw(width, height, bytes.to_vec()).ok_or_else(
+                || {
+                    PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                        "Failed to create RGB image buffer",
+                    )
+                },
+            )?,
         ),
         4 => DynamicImage::ImageRgba8(
-            ImageBuffer::<Rgba<u8>, _>::from_raw(width, height, bytes.to_vec())
-                .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                    "Failed to create RGBA image buffer"
-                ))?
+            ImageBuffer::<Rgba<u8>, _>::from_raw(width, height, bytes.to_vec()).ok_or_else(
+                || {
+                    PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                        "Failed to create RGBA image buffer",
+                    )
+                },
+            )?,
         ),
         1 => DynamicImage::ImageLuma8(
-            ImageBuffer::<Luma<u8>, _>::from_raw(width, height, bytes.to_vec())
-                .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                    "Failed to create grayscale image buffer"
-                ))?
+            ImageBuffer::<Luma<u8>, _>::from_raw(width, height, bytes.to_vec()).ok_or_else(
+                || {
+                    PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                        "Failed to create grayscale image buffer",
+                    )
+                },
+            )?,
         ),
         _ => {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                format!("Unsupported channel count: {}", channels)
-            ));
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Unsupported channel count: {}",
+                channels
+            )));
         }
     };
 
@@ -296,24 +327,29 @@ fn encode_image<'py>(
         "gif" => ImageFormat::Gif,
         "tiff" => ImageFormat::Tiff,
         _ => {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                format!("Unsupported format: {}", format)
-            ));
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Unsupported format: {}",
+                format
+            )));
         }
     };
 
     if img_format == ImageFormat::Jpeg || img_format == ImageFormat::WebP {
         // Convert to RGB8 for lossy formats if necessary
         let rgb_img = img.to_rgb8();
-        rgb_img.write_to(&mut buffer, img_format)
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
-                format!("Failed to encode image: {}", e)
-            ))?;
+        rgb_img.write_to(&mut buffer, img_format).map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                "Failed to encode image: {}",
+                e
+            ))
+        })?;
     } else {
-        img.write_to(&mut buffer, img_format)
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
-                format!("Failed to encode image: {}", e)
-            ))?;
+        img.write_to(&mut buffer, img_format).map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                "Failed to encode image: {}",
+                e
+            ))
+        })?;
     }
 
     Ok(PyBytes::new(py, &buffer.into_inner()))
@@ -329,10 +365,9 @@ fn decode_image<'py>(
     _py: Python<'py>,
     data: &[u8],
 ) -> PyResult<(Bound<'py, PyArray3<u8>>, String)> {
-    let img = image::load_from_memory(data)
-        .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
-            format!("Failed to decode image: {}", e)
-        ))?;
+    let img = image::load_from_memory(data).map_err(|e| {
+        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("Failed to decode image: {}", e))
+    })?;
 
     let (width, height) = (img.width(), img.height());
     let format_str = format!("{:?}", img.color());
@@ -343,7 +378,8 @@ fn decode_image<'py>(
         DynamicImage::ImageLuma8(img) => (1, img.into_raw()),
         DynamicImage::ImageLumaA8(img) => {
             // Convert LumaA to RGBA
-            let rgba: Vec<u8> = img.pixels()
+            let rgba: Vec<u8> = img
+                .pixels()
                 .flat_map(|p| vec![p[0], p[0], p[0], p[1]])
                 .collect();
             (4, rgba)
@@ -357,9 +393,12 @@ fn decode_image<'py>(
     let out_array = PyArray3::from_owned_array(
         _py,
         ndarray::Array::from_shape_vec([height as usize, width as usize, channels], raw_data)
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                format!("Failed to create array: {}", e)
-            ))?
+            .map_err(|e| {
+                PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                    "Failed to create array: {}",
+                    e
+                ))
+            })?,
     );
     Ok((out_array, format_str))
 }
@@ -373,17 +412,24 @@ fn decode_image<'py>(
 fn get_image_info(_py: Python<'_>, data: &[u8]) -> PyResult<(u32, u32, String)> {
     let reader = image::ImageReader::new(Cursor::new(data))
         .with_guessed_format()
-        .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
-            format!("Failed to read image: {}", e)
-        ))?;
+        .map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                "Failed to read image: {}",
+                e
+            ))
+        })?;
 
     let format = reader.format();
-    let dimensions = reader.into_dimensions()
-        .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
-            format!("Failed to get image dimensions: {}", e)
-        ))?;
+    let dimensions = reader.into_dimensions().map_err(|e| {
+        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+            "Failed to get image dimensions: {}",
+            e
+        ))
+    })?;
 
-    let format_str = format.map(|f| format!("{:?}", f)).unwrap_or_else(|| "Unknown".to_string());
+    let format_str = format
+        .map(|f| format!("{:?}", f))
+        .unwrap_or_else(|| "Unknown".to_string());
     Ok((dimensions.0, dimensions.1, format_str))
 }
 
@@ -405,12 +451,13 @@ fn batch_resize<'py>(
     let shape = arr.shape();
     if shape.len() != 4 {
         return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-            "Input array must be 4D (N, H, W, C)"
+            "Input array must be 4D (N, H, W, C)",
         ));
     }
     let batch_size = shape[0];
     let channels = shape[3];
-    let out_size = (batch_size * target_height as usize * target_width as usize * channels) as usize;
+    let out_size =
+        (batch_size * target_height as usize * target_width as usize * channels) as usize;
     let mut output = Vec::with_capacity(out_size);
 
     for i in 0..batch_size {
@@ -421,33 +468,46 @@ fn batch_resize<'py>(
         let height = shape[1] as u32;
         let width = shape[2] as u32;
 
-        let img = match channels {
-            3 => DynamicImage::ImageRgb8(
-                ImageBuffer::<Rgb<u8>, _>::from_raw(width, height, bytes.to_vec())
-                    .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                        "Failed to create RGB image buffer"
-                    ))?
-            ),
-            4 => DynamicImage::ImageRgba8(
-                ImageBuffer::<Rgba<u8>, _>::from_raw(width, height, bytes.to_vec())
-                    .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                        "Failed to create RGBA image buffer"
-                    ))?
-            ),
-            1 => DynamicImage::ImageLuma8(
-                ImageBuffer::<Luma<u8>, _>::from_raw(width, height, bytes.to_vec())
-                    .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                        "Failed to create grayscale image buffer"
-                    ))?
-            ),
-            _ => {
-                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                    format!("Unsupported channel count: {}", channels)
-                ));
-            }
-        };
+        let img =
+            match channels {
+                3 => DynamicImage::ImageRgb8(
+                    ImageBuffer::<Rgb<u8>, _>::from_raw(width, height, bytes.to_vec()).ok_or_else(
+                        || {
+                            PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                                "Failed to create RGB image buffer",
+                            )
+                        },
+                    )?,
+                ),
+                4 => DynamicImage::ImageRgba8(
+                    ImageBuffer::<Rgba<u8>, _>::from_raw(width, height, bytes.to_vec())
+                        .ok_or_else(|| {
+                            PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                                "Failed to create RGBA image buffer",
+                            )
+                        })?,
+                ),
+                1 => DynamicImage::ImageLuma8(
+                    ImageBuffer::<Luma<u8>, _>::from_raw(width, height, bytes.to_vec())
+                        .ok_or_else(|| {
+                            PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                                "Failed to create grayscale image buffer",
+                            )
+                        })?,
+                ),
+                _ => {
+                    return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                        "Unsupported channel count: {}",
+                        channels
+                    )));
+                }
+            };
 
-        let resized = img.resize(target_width, target_height, image::imageops::FilterType::Lanczos3);
+        let resized = img.resize(
+            target_width,
+            target_height,
+            image::imageops::FilterType::Lanczos3,
+        );
         let raw = match resized {
             DynamicImage::ImageRgb8(img) => img.into_raw(),
             DynamicImage::ImageRgba8(img) => img.into_raw(),
@@ -460,11 +520,20 @@ fn batch_resize<'py>(
     let out_array = PyArray4::from_owned_array(
         _py,
         ndarray::Array::from_shape_vec(
-            [batch_size, target_height as usize, target_width as usize, channels],
-            output
-        ).map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(
-            format!("Failed to create output array: {}", e)
-        ))?
+            [
+                batch_size,
+                target_height as usize,
+                target_width as usize,
+                channels,
+            ],
+            output,
+        )
+        .map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Failed to create output array: {}",
+                e
+            ))
+        })?,
     );
     Ok(out_array)
 }
