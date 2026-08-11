@@ -1,14 +1,13 @@
 from typing import Union
 from pathlib import Path
-from io import BytesIO
 
 import av
-import librosa
 import numpy as np
-import requests
 from docarray import BaseDoc
 from docarray.typing import NdArray
 from pydantic import Field, ConfigDict
+
+from ._core import audio as core_audio
 
 
 class Audio(BaseDoc):
@@ -43,17 +42,20 @@ class Audio(BaseDoc):
 
         Raises:
             ValueError: If loading fails.
+
+        Examples:
+            >>> audio = Audio(uri="input.wav").load(sample_rate=16000, mono=True)
+            >>> audio.sample_rate
+            16000
         """
         try:
-            if Path(self.uri).exists():
-                data, sample_rate = librosa.load(self.uri, sr=sample_rate, mono=mono)
-            else:
-                bytes_ = requests.get(self.uri).content
-                data, sample_rate = librosa.load(
-                    BytesIO(bytes_), sr=sample_rate, mono=mono
-                )
+            if self.uri is None:
+                raise ValueError("Audio URI is not set")
+            data, loaded_sample_rate = core_audio.load_audio(
+                str(self.uri), sample_rate=sample_rate, mono=mono
+            )
             self.data = data
-            self.sample_rate = sample_rate
+            self.sample_rate = loaded_sample_rate
         except Exception as e:
             raise ValueError(f"Failed to load audio from {self.uri}. {e}")
         return self
@@ -129,7 +131,7 @@ class Audio(BaseDoc):
 
         container = av.open(str(path), mode="w", **open_kw)
         try:
-            stream = container.add_stream(codec, rate=self.sample_rate)
+            stream = container.add_stream(codec, rate=self.sample_rate, layout=layout)
             frame = av.AudioFrame.from_ndarray(
                 planar, format=av_sample_format, layout=layout
             )
@@ -144,7 +146,7 @@ class Audio(BaseDoc):
     def save(self, path: str | Path, format: str | None = None) -> "Audio":
         """将音频数据写入本地文件（全部经 PyAV / FFmpeg 编码）。
 
-        默认格式为 **MP3**（``libmp3lame``）。单声道为 ``(n_samples,)``；立体声 librosa 风格为
+        默认格式为 **MP3**（``libmp3lame``）。单声道为 ``(n_samples,)``；立体声使用
         ``(2, n_samples)``。
 
         Args:
@@ -192,9 +194,7 @@ class Audio(BaseDoc):
             format = format_map.get(path_obj.suffix.lower(), "MP3")
 
         try:
-            self._save_av(
-                path_obj, planar, av_sample_format, layout, format.upper()
-            )
+            self._save_av(path_obj, planar, av_sample_format, layout, format.upper())
         except ValueError:
             raise
         except Exception as e:
@@ -220,8 +220,17 @@ class Audio(BaseDoc):
 
     @property
     def duration_s(self):
-        """Get the duration of the audio file in seconds."""
-        return librosa.get_duration(y=self.data, sr=self.sample_rate)
+        """Get the duration of the loaded audio in seconds."""
+        if self.data is None or self.sample_rate is None:
+            raise ValueError("Audio data and sample rate must be set")
+        data = np.asarray(self.data)
+        if data.ndim == 1:
+            sample_count = data.shape[0]
+        elif data.ndim == 2:
+            sample_count = data.shape[1]
+        else:
+            raise ValueError(f"Audio data must be 1D or 2D, got {data.ndim}D")
+        return sample_count / self.sample_rate
 
     @property
     def duration_ms(self):

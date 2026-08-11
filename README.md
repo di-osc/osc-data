@@ -35,7 +35,7 @@ pip install osc-data --upgrade
 pip install git+https://github.com/di-osc/osc-data.git
 
 # 安装指定版本（示例）
-pip install "osc-data>=0.3.1"
+pip install "osc-data>=0.3.2"
 ```
 
 ### 从源码安装
@@ -242,7 +242,7 @@ db = compute_decibel(audio.data, audio.sample_rate)
 |-----------|------|
 | `uri` | 音频路径或 URL |
 | `sample_rate` | 采样率（Hz） |
-| `data` | 波形数组（librosa load 结果） |
+| `data` | `float32` 波形数组；单声道为 `(samples,)`，多声道为 `(channels, samples)` |
 | `load(sample_rate, mono)` | 加载；可指定目标采样率与是否单声道 |
 | `duration_s` / `duration_ms` | 时长（秒 / 毫秒） |
 | `save(path, format)` | 经 PyAV 编码保存；支持 MP3、WAV、FLAC、OGG 等 |
@@ -343,7 +343,6 @@ cargo fmt
 - `docarray`: 多模态数据类型系统
 - `numpy`: 数组操作
 - `requests`: HTTP 请求
-- `librosa` >= 0.11.0: 音频处理
 - `av` >= 10.0.0: 视频/音频编解码
 - `wasabi` >= 1.1.0: 格式化日志输出
 
@@ -351,6 +350,7 @@ cargo fmt
 - `pyo3` >= 0.25.0: Python 绑定
 - `numpy`: NumPy 数组操作
 - `ndarray`: Rust 多维数组
+- `asr-data` >= 0.1.1: 音频解码、波形处理与重采样
 - `image` >= 0.25.0: 图像处理
 - `regex`: 正则表达式
 
