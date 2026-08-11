@@ -1,6 +1,6 @@
 [project]
 name = "osc-data"
-version = "0.3.1"
+version = "0.3.2"
 description = "data represent, processing"
 readme = "README.md"
 authors = [
@@ -12,7 +12,6 @@ dependencies = [
     "pydantic>=2.11.7",
     "docarray",
     "requests>=2.32.5",
-    "librosa>=0.11.0",
     "av>=10.0.0",
     "wasabi>=1.1.0",
 ]
